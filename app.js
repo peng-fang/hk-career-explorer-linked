@@ -362,8 +362,7 @@
           <p>${number(active.count)} ${t("个职业组空缺","vacancies in this occupation group")} · ${vacancyShare(active)}
             ${t("占该行业全部空缺","of all vacancies in this industry")} · ${t("行业空缺率","Industry vacancy rate")} ${percent(market.rate*100)} · ${market.period}</p>
           ${alreadyAdded ? `<p class="good">${t("已加入比较","In your comparison")}</p>` : `<div class="chip-row">
-            ${chip("addPair",state.vacancyCell,t("加入比较","Add to comparison"))}
-            ${chip("addBenchmark",state.vacancyCell,t("加入作对照","Add as a benchmark"))}</div>`}`
+            ${chip("addPair",state.vacancyCell,t("加入比较","Add to comparison"))}</div>`}`
           : `<p>${t("点一个热力格查看招聘证据。","Select a heatmap cell to inspect the hiring evidence.")}</p>`}
       </div></section>`;
   }
@@ -746,10 +745,10 @@
       state.occupations="tasks";
     }
     if(key==="vacancyCell") state.vacancyCell=value;
-    if(key==="addPair" || key==="addBenchmark") {
+    if(key==="addPair") {
       const [id,occupation] = value.split("|");
       if(!state.pairs.some(pair=>keyOf(pair)===value) && pathway.findVacancy(id,occupation)) {
-        state.pairs.push({id,occupation,kept:false,note:"",comparison:key==="addBenchmark"});
+        state.pairs.push({id,occupation,kept:false,note:""});
       }
     }
     if(key==="keepPair") {
@@ -770,7 +769,7 @@
         targetPay:25000,maxHours:42,targetSurplus:6000,offer:25000,rent:10000,living:6500,deduct:2000,
       });
     }
-    const focusKey = key==="addPair" || key==="addBenchmark" ? "vacancyCell:"+value : el.dataset.focus;
+    const focusKey = key==="addPair" ? "vacancyCell:"+value : el.dataset.focus;
     render(focusKey);
     if(key==="occupationGroup") $("hiring").scrollIntoView({block:"start"});
   }

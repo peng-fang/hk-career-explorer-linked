@@ -96,7 +96,7 @@
 
   function examplePairs(keep = false) {
     return ["ind_K","ind_J","ind_L"].map(id => ({
-      id, occupation:professional, kept:keep, note:"", comparison:id === "ind_L",
+      id, occupation:professional, kept:keep, note:"",
     }));
   }
 
