@@ -50,6 +50,9 @@ h1, h2, h3, p, figure { margin: 0; }
 .workspace { min-width: 0; }
 .topline { display: flex; justify-content: space-between; align-items: center; min-height: 67px; margin: 0 34px; color: var(--muted); font-size: 13px; }
 .topline #breadcrumb span { padding: 0 4px; color: #9c849e; }
+.top-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.language-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 680; }
+.language-picker select { min-width: 105px; }
 .top-action { border-radius: 99px; border: 1px solid #d7c5db; color: var(--plum); font-weight: 720; padding: 7px 13px; }
 .top-action:hover, .source-link:hover { color: #482b5a; }
 main, .footer { max-width: 1520px; margin: auto; padding: 0 34px; }
@@ -178,6 +181,12 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .source-card li { margin: 5px 0; }
 .bubble-keys { margin: 0 0 8px; }
 .bubble-keys .chip { border-style: dotted; }
+.heat thead th { overflow-wrap: normal; }
+html[lang="en"] { --text: "Segoe UI", system-ui, sans-serif; --serif: Georgia, serif; }
+html[lang="en"] .brand small { display: none; }
+html[lang="en"] .hero h1 { font-size: clamp(31px, 3.28vw, 52px); letter-spacing: -.035em; }
+html[lang="en"] .range-name { overflow-wrap: normal; }
+html[lang="en"] .compact-table th:first-child { min-width: 155px; }
 
 @media (max-width: 1150px) {
   .layout { grid-template-columns: 182px minmax(0, 1fr); }
@@ -199,7 +208,10 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 }
 @media (max-width: 640px) {
   main, .footer { padding-inline: 12px; }
-  .topline { margin-inline: 12px; font-size: 12px; }
+  .topline { margin-inline: 12px; font-size: 12px; gap: 6px; }
+  .top-controls { gap: 5px; }
+  .top-action { padding-inline: 8px; text-align: center; }
+  .language-picker > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .hero { grid-template-columns: 1fr; }
   .hero-copy { padding: 23px 18px 24px; }
   .hero-image { height: 181px; min-height: 0; }

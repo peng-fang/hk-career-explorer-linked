@@ -2,6 +2,7 @@
 (() => {
   "use strict";
 
+  const {t,year:yearLabel} = globalThis.guideLanguage;
   const purple = "#76568d";
   const rose = "#ac4e72";
   const colors = [purple, "#b783aa", "#65928e", "#bb8b55", "#a184b3", "#797f9d", "#c6929a", "#908575", "#b5a6bd"];
@@ -42,7 +43,7 @@
   function series(w, sets, opt) {
     const h = opt.height ?? 238;
     const visible = sets.flatMap(s => s.points.filter(p => Number.isFinite(p[1])));
-    if (!visible.length) return empty("该条件下没有数据。");
+    if (!visible.length) return empty(t("该条件下没有数据。","No data for this selection."));
     const xs = visible.map(p=>p[0]), ys = visible.map(p=>p[1]);
     const d = {
       ...opt, x: opt.x ?? [Math.min(...xs), Math.max(...xs)],
@@ -92,10 +93,10 @@
     content += line(a.x(year),a.top,a.x(year),a.bottom,"refline");
     if (action) for (const [i,y] of years.entries()) {
       const step = (a.right-a.left)/(years.length-1);
-      const tip = y + "年\n" + sets.map(s=>s.name + " " + percent(s.values[i])).join("\n");
+      const tip = yearLabel(y) + "\n" + sets.map(s=>s.name + " " + percent(s.values[i])).join("\n");
       content += `<rect x="${Math.max(a.left,a.x(y)-step/2)}" y="${a.top}" width="${i===0 || i===years.length-1 ? step/2 : step}" height="${a.bottom-a.top}" fill="transparent" ${mark(tip,y>=2016 ? action : null,y)}/>`;
     }
-    return svg(w,h,"各行业占全部香港就业的百分比堆叠面积图",content);
+    return svg(w,h,t("各行业占全部香港就业的百分比堆叠面积图","Stacked area chart of industry shares in Hong Kong employment"),content);
   }
 
   function bars(rows, opt = {}) {
@@ -103,7 +104,7 @@
     const draw = (v,i,cap) => Number.isFinite(v)
       ? `<span class="bar" style="width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? colors[i]}" data-tip="${esc((opt.labels?.[i] ?? "")+" "+(opt.format ?? number)(v))}"><b>${esc((opt.format ?? number)(v))}</b></span>`
       : '<span>—</span>';
-    return `<div class="bars" role="group" aria-label="${esc(opt.label ?? "条形图")}">${rows.map(r=>{
+    return `<div class="bars" role="group" aria-label="${esc(opt.label ?? t("条形图","Bar chart"))}">${rows.map(r=>{
       const tracks = opt.mirror
         ? `<div class="mirror">${r.values.map((v,i)=>`<span class="half">${draw(v,i,64)}</span>`).join("")}</div>`
         : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((v,i)=>draw(v,i,73)).join("")}</div>`;
@@ -120,7 +121,7 @@
       start = end;
       return part;
     });
-    return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${slices.join(",")})" aria-hidden="true"><span>${number(total)}<small>千人</small></span></div>
+    return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${slices.join(",")})" aria-hidden="true"><span>${number(total)}<small>${t("千人","thousand people")}</small></span></div>
       <ul class="donut-legend">${rows.map((r,i)=>`<li><i style="background:${colors[i]}"></i><span>${esc(r.name)}</span><strong>${percent(r.value/total*100)}</strong></li>`).join("")}</ul></div>`;
   }
 
@@ -137,8 +138,8 @@
         ? [...layout(a,x,y,w*f,h),...layout(b,x+w*f,y,w*(1-f),h)]
         : [...layout(a,x,y,w,h*f),...layout(b,x,y+h*f,w,h*(1-f))];
     }
-    return `<div class="treemap" aria-label="职业人数矩形树图">${layout(ranked,0,0,100,100).map((r,i)=>{
-      const tip = `${r.name} · ${number(r.value)} 千人 · ${percent(r.value/total*100)}`;
+    return `<div class="treemap" aria-label="${t("职业人数矩形树图","Treemap of employment by occupation")}">${layout(ranked,0,0,100,100).map((r,i)=>{
+      const tip = `${r.name} · ${number(r.value)}${t(" 千人"," thousand people")} · ${percent(r.value/total*100)}`;
       return `<button type="button" aria-label="${esc(tip)}" data-tip="${esc(tip)}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:${["#d8c5e2","#eac5db","#ccbedf","#d5d5e7","#e2cfd7","#c8d8d5","#ddcbbf","#e5dce8","#dbc8d3"][i]};color:#2b2030"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
     }).join("")}</div>`;
   }
@@ -149,26 +150,26 @@
       xFormat:percent,yFormat:percent,right:21,bottom:44});
     let content=a.grid+line(a.left,a.y(0),a.right,a.y(0),"refline")
       +line(a.x(1.7),a.top,a.x(1.7),a.bottom,"refline")
-      +text(a.right,250,"职位空缺率","end")+text(a.x(1.7)+5,a.top+7,"总体 1.7%","start");
+      +text(a.right,250,t("职位空缺率","Vacancy rate"),"end")+text(a.x(1.7)+5,a.top+7,t("总体 1.7%","Overall 1.7%"),"start");
     const max = Math.max(...values.map(r=>r.openings));
     for(const r of values.slice().sort((a,b)=>b.openings-a.openings)) {
       const selected = picked.includes(r.id);
-      const tip = `${r.name}\n空缺率 ${percent(r.rate*100)} · ${number(r.openings)} 个\n用工同比 ${percent(r.yoy*100)}`;
+      const tip = `${r.name}\n${t("空缺率","Vacancy rate")} ${percent(r.rate*100)} · ${number(r.openings)}${t(" 个"," vacancies")}\n${t("用工同比","Employment YoY")} ${percent(r.yoy*100)}`;
       content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,"bubble",r.id,selected)}/>`;
     }
-    return svg(w,h,"招聘机会地图，横轴职位空缺率，纵轴机构用工同比",content);
+    return svg(w,h,t("招聘机会地图，横轴职位空缺率，纵轴机构用工同比","Hiring opportunities. X: vacancy rate. Y: year-on-year employment change."),content);
   }
 
   function waterfall(w, amounts) {
     const data = [amounts.offer,-amounts.rent,-amounts.living,-amounts.deduct];
-    const steps = ["Offer 月薪","每月房租","生活交通","预留扣款"];
+    const steps = t(["Offer 月薪","每月房租","生活交通","预留扣款"],["Offer","Rent","Living","Set-aside"]);
     let acc=0;
     const rows = data.map((v,i)=>{
       const s = {label:steps[i],value:v,from:acc,to:acc+v};
       acc += v;
       return s;
     });
-    rows.push({label:"每月结余",value:acc,from:0,to:acc});
+    rows.push({label:t("每月结余","Surplus"),value:acc,from:0,to:acc});
     const vals = rows.flatMap(r=>[r.from,r.to]), h=234;
     const min = Math.min(...vals), max=Math.max(...vals, 1);
     const delta = Math.max(max-min, 1000);
@@ -184,7 +185,7 @@
       if(i<3) content+=line(x+width/2,a.y(r.to),a.x(i+1)-width/2,a.y(r.to),"gridline");
       content+=text(x,high-5,number(r.value/1000)+"k")+text(x,a.bottom+23,r.label);
     });
-    return svg(w,h,"个人生活预算瀑布图",content);
+    return svg(w,h,t("个人生活预算瀑布图","Monthly budget waterfall chart"),content);
   }
 
   globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall};
