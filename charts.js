@@ -108,7 +108,7 @@
       const tracks = opt.mirror
         ? `<div class="mirror">${r.values.map((v,i)=>`<span class="half">${draw(v,i,64)}</span>`).join("")}</div>`
         : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((v,i)=>draw(v,i,73)).join("")}</div>`;
-      return `<div class="bar-row"><span class="name">${esc(r.name)}</span>${tracks}</div>`;
+      return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}</div>`;
   }
 
@@ -140,7 +140,8 @@
     }
     return `<div class="treemap" aria-label="${t("职业人数矩形树图","Treemap of employment by occupation")}">${layout(ranked,0,0,100,100).map((r,i)=>{
       const tip = `${r.name} · ${number(r.value)}${t(" 千人"," thousand people")} · ${percent(r.value/total*100)}`;
-      return `<button type="button" aria-label="${esc(tip)}" data-tip="${esc(tip)}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:${["#d8c5e2","#eac5db","#ccbedf","#d5d5e7","#e2cfd7","#c8d8d5","#ddcbbf","#e5dce8","#dbc8d3"][i]};color:#2b2030"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
+      const action = r.occupation ? ` data-action="occupationGroup" data-value="${esc(r.occupation)}"` : "";
+      return `<button type="button" aria-label="${esc(tip)}" data-tip="${esc(tip)}"${action} style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:${["#d8c5e2","#eac5db","#ccbedf","#d5d5e7","#e2cfd7","#c8d8d5","#ddcbbf","#e5dce8","#dbc8d3"][i]};color:#2b2030"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
     }).join("")}</div>`;
   }
 
