@@ -418,6 +418,12 @@
   }
 
   function intervals(rows, type, selectedIndustries) {
+    const median = type+"50";
+    const orderedRows = rows.slice().sort((a,b)=>{
+      const first = a[median] ?? -Infinity;
+      const second = b[median] ?? -Infinity;
+      return first===second ? 0 : second-first;
+    });
     const pay=type==="pay", target=pay?state.targetPay:state.maxHours;
     const step=pay?10000:10;
     const upper=Math.max(pay?50000:60,target, ...rows.map(r=>r[type+"75"] ?? 0));
@@ -430,7 +436,7 @@
     return `<div class="legend"><span><i style="background:#cdb5de"></i>P25–P75</span><span><i style="background:${rose}"></i>P50</span>
       <span>${t("虚线","Dashed line")} · ${targetName} ${shortTarget}</span>
       <span><i class="range-selection-key"></i>${t("已确认方向所属行业","Industry covering a confirmed option")}</span></div>
-      ${rows.map(r=>{
+      ${orderedRows.map(r=>{
         const selected=selectedIndustries.has(r.id);
         const a=r[type+"25"], m=r[type+"50"], b=r[type+"75"];
         const tip=label(r.name)+" · "+[a,m,b].map(number).join(" / ")+" · "+(pay?t("港元／月","HKD/month"):t("小时／周","hours/week"));
