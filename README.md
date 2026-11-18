@@ -2,7 +2,7 @@
 
 嘉宁先用专业、工作兴趣和技能探索职业组，再根据招聘证据选定「行业 × 职业组」。她核查风险与收入之后，在预算页检验自己的工资、工时和结余条件。
 
-**[简体中文](https://peng-fang.github.io/hk-career-explorer-v2/?lang=zh-Hans)** · **[English](https://peng-fang.github.io/hk-career-explorer-v2/?lang=en)** · **[四章版 15 分钟演示](docs/四章版_15分钟演示.md)** · **[五章第一版](https://peng-fang.github.io/hk-graduate-job-guide/)**
+**[简体中文](https://peng-fang.github.io/hk-career-explorer-v2/?lang=zh-Hans)** · **[English](https://peng-fang.github.io/hk-career-explorer-v2/?lang=en)** · **[四章版 15 分钟演示](docs/四章版_15分钟演示.md)**
 
 ## 浏览与演示
 
