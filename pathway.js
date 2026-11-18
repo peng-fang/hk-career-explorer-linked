@@ -37,29 +37,29 @@
   const professional = "Professionals";
   const associate = "Associate professionals";
   const rules = [
-    { majors:["analytics","business","statistics"], interests:["analyse"], skills:["sql","viz"],
+    { id:"data-analysis", majors:["analytics","business","statistics"], interests:["analyse"], skills:["sql","viz"],
       groups:[professional,associate], task:["分析数据、制作报表、解释结果","Analyse data, build reports and explain findings"],
       words:["商业分析、BI、报告分析","business analysis, BI, reporting analyst"] },
-    { majors:["computing"], interests:["build"], skills:["code"],
+    { id:"information-systems", majors:["computing"], interests:["build"], skills:["code"],
       groups:[professional,associate], task:["开发、测试和维护信息系统","Develop, test and maintain information systems"],
       words:["软件开发、系统分析、技术支援","software development, systems analysis, technical support"] },
-    { majors:["design"], interests:["create"], skills:["production","writing"],
+    { id:"design-content", majors:["design"], interests:["create"], skills:["production","writing"],
       groups:[professional,associate], task:["视觉设计、内容制作、传播执行","Visual design, content production and communications"],
       words:["视觉设计、内容制作、品牌传播","visual design, content production, brand communications"] },
-    { majors:["engineering"], interests:["handsOn"], skills:["labs"],
+    { id:"engineering", majors:["engineering"], interests:["handsOn"], skills:["labs"],
       groups:[professional,associate,"Craft and related trades workers"],
       task:["工程设计、技术检查、现场维护","Engineering design, technical inspections and maintenance"],
       words:["助理工程师、测试技术员、设备维护","assistant engineer, test technician, equipment maintenance"] },
-    { majors:["science","education"], interests:["research"], skills:["labs","writing"],
+    { id:"research-teaching", majors:["science","education"], interests:["research"], skills:["labs","writing"],
       groups:[professional,associate], task:["收集证据、开展研究和教学","Collect evidence, conduct research and teach"],
       words:["研究助理、科学技术员、教学","research assistant, scientific technician, teaching"] },
-    { majors:["health"], interests:["care"], skills:[],
+    { id:"health-care", majors:["health"], interests:["care"], skills:[],
       groups:[professional,associate,"Services and sales workers"], task:["提供医疗技术支持和照护","Provide clinical support and care"],
       words:["健康技术员、照护服务、康复支援","health technician, care services, rehabilitation support"] },
-    { majors:["business"], interests:["serve"], skills:["customers"],
+    { id:"customer-service", majors:["business"], interests:["serve"], skills:["customers"],
       groups:["Services and sales workers",associate], task:["了解客户需求、处理服务和销售","Understand customer needs, provide service and support sales"],
       words:["客户服务、销售顾问、客户支援","customer service, sales adviser, client support"] },
-    { majors:[], interests:["organise"], skills:["project"],
+    { id:"operations", majors:[], interests:["organise"], skills:["project"],
       groups:[associate,"Clerical support workers"], task:["协调项目、处理记录和流程","Coordinate projects, records and workflows"],
       words:["项目助理、运营协调、行政支援","project assistant, operations coordinator, administrative support"] },
   ];
@@ -67,6 +67,7 @@
   const nameOf = (catalog, key) => catalog[key] ? t(...catalog[key]) : "";
   const emptyProfile = () => ({major:"",minor:"",interests:[],skills:[],keywords:""});
   const exampleProfile = () => ({major:"analytics",minor:"",interests:["analyse"],skills:["sql","viz"],keywords:""});
+  const exampleTaskOccupations = () => ({"data-analysis":professional});
   const pairKey = (id, occupation) => `${id}|${occupation}`;
   const findVacancy = (id, occupation) => globalThis.guideData.occupations.find(row => row.id === id && row.name === occupation);
   const equityIndustry = {
@@ -89,7 +90,7 @@
         ...profile.interests.filter(key => rule.interests.includes(key)).map(key => nameOf(interests,key)),
         ...profile.skills.filter(key => rule.skills.includes(key)).map(key => nameOf(skills,key)),
       ];
-      return { groups:rule.groups, task:t(...rule.task), words:t(...rule.words), match };
+      return { id:rule.id, groups:rule.groups, task:t(...rule.task), words:t(...rule.words), match };
     }).filter(rule => rule.match.length).sort((a,b) => b.match.length-a.match.length);
   }
 
@@ -113,7 +114,7 @@
   }
 
   globalThis.guidePathway = {
-    majors, interests, skills, occupationGroups, nameOf, emptyProfile, exampleProfile,
+    majors, interests, skills, occupationGroups, nameOf, emptyProfile, exampleProfile, exampleTaskOccupations,
     pairKey, findVacancy, equityIndustry, suggestions, examplePairs, load, save,
   };
 })();

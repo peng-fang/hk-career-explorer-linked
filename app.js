@@ -30,7 +30,7 @@
     marketPeriod:"latest", overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
-    profile:pathway.emptyProfile(), pairs:[], occupations:"all", vacancyCell:"", sortBy:"surplus",
+    profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
     ...pathway.load(),
   };
   const aliases = {
@@ -71,8 +71,8 @@
     return `<div data-chart="${id}"></div>`;
   };
   const grid = (...items) => `<div class="grid">${items.join("")}</div>`;
-  const select = (key,title,choices,render=String) => `<label class="field">${title}<select id="${key}" data-control="${key}">
-    ${choices.map(v=>`<option value="${esc(v)}"${state[key]===v?" selected":""}>${esc(render(v))}</option>`).join("")}</select></label>`;
+  const select = (key,title,choices,render=String,selected=state[key]) => `<label class="field">${title}<select id="${key}" data-control="${key}">
+    ${choices.map(v=>`<option value="${esc(v)}"${selected===v?" selected":""}>${esc(render(v))}</option>`).join("")}</select></label>`;
   const budgetField = (key,title,step) => `<label class="field">${title}<input id="${key}" type="number" min="0" max="${key==="maxHours"?168:10000000}" step="${step}" value="${state[key]}" data-control="${key}"></label>`;
   const controls = (...items) => `<div class="control-bar">${items.join("")}</div>`;
   const hint = (zh,en) => `<p class="mode-note">${t(zh,en)}</p>`;
@@ -161,9 +161,11 @@
             occupation:pathway.occupationGroups.includes(r.name)?r.name:null}))),
           t("职业描述做什么，行业描述雇主经营什么。聚焦色块可查看就业人数和占比，点击共有职业组可查看招聘空缺。",
             "Occupations describe what people do. Focus a tile for employment count and share, or select a matching occupation group to explore current vacancies.")));
-    return heading(pages[1],1) + profilePanel()
+    const rules = pathway.suggestions(state.profile);
+    const taskGroups = new Set(rules.map(rule=>state.taskOccupations[rule.id]).filter(Boolean));
+    return heading(pages[1],1) + profilePanel(rules)
       + appendix("structure-data",t("查阅香港行业与职业结构","Explore Hong Kong’s industries and occupations"),overview)
-      + vacancyPanel() + pairReview(false) + next(1);
+      + vacancyPanel(taskGroups) + pairReview(false) + next(1);
   }
 
   function risk() {
@@ -274,9 +276,8 @@
       }).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
-  function profilePanel() {
+  function profilePanel(rules) {
     const profile = state.profile;
-    const rules = pathway.suggestions(profile);
     const major = (key, title) => `<label class="field">${title}<select id="${key}" data-profile="${key}">
       <option value="">${t("请选择或跳过","Choose or skip")}</option>
       ${Object.keys(pathway.majors).map(id => `<option value="${id}"${profile[key]===id?" selected":""}>${esc(pathway.nameOf(pathway.majors,id))}</option>`).join("")}
@@ -297,19 +298,25 @@
           placeholder="${t("例如摄影、零售数据分析","For example, photography or retail analytics")}"></label>
       <p class="mode-note">${t("自定义词会带到最终页，供搜索招聘广告时参考。","Custom terms carry to the final page for searching job ads.")}</p>
       ${rules.length ? `<div class="pathway-rules"><h3>${t("按工作任务找职业组","Find occupation groups by the work they do")}</h3>
-        ${rules.map(rule=>`<article class="pathway-rule"><strong>${esc(rule.task)}</strong>
+        ${rules.map(rule=>`<article class="pathway-rule" data-rule="${esc(rule.id)}"><strong>${esc(rule.task)}</strong>
           <p>${esc(list(rule.match))}</p>
           <p>${t("岗位搜索词","Job-ad keywords")} · ${esc(rule.words)}</p>
-          <div class="chip-row">${rule.groups.map(group=>chip("occupationGroup",group,label(group),state.occupations===group)).join("")}</div>
+          <div class="chip-row" role="group" aria-label="${esc(rule.task)}">
+            ${rule.groups.map(group=>chip("taskOccupation",`${rule.id}|${group}`,label(group),state.taskOccupations[rule.id]===group)).join("")}</div>
         </article>`).join("")}
-        <p class="mode-note">${t("职业组建议来自项目整理的任务规则。实际职业分类取决于岗位职责。","These occupation suggestions use project-curated task rules. Actual classification depends on job duties.")}</p></div>` : ""}
+        <p class="mode-note">${t("每项任务可独立选一个职业组，热力表会合并同名职业组。实际职业分类取决于岗位职责。",
+          "Choose one occupation per task. The heatmap combines duplicate groups. Actual classification depends on job duties.")}</p>
+        <a class="secondary-link" href="#hiring" data-scroll="hiring">${t("查看招聘热力表","Go to the vacancy heatmap")} ↓</a></div>` : ""}
       </section>`;
   }
 
-  function vacancyPanel() {
+  function vacancyPanel(taskGroups) {
     const picked = state.selected;
     const chosen = d.demand.filter(r=>!picked.length||picked.includes(r.id));
-    const groups = pathway.occupationGroups.filter(name => state.occupations==="all" || state.occupations===name);
+    const scope = state.occupations==="tasks" && !taskGroups.size ? "all" : state.occupations;
+    const groups = pathway.occupationGroups.filter(name =>
+      scope==="all" || scope===name || (scope==="tasks" && taskGroups.has(name)));
+    const occupationScopes = taskGroups.size ? ["tasks","all",...pathway.occupationGroups] : ["all",...pathway.occupationGroups];
     const demandLabels = groups.map(name=>({name:label(name),key:name}));
     const maxCount = Math.max(1,...d.occupations.map(row=>row.count ?? 0));
     const isCount = state.vacancyMode==="count";
@@ -332,7 +339,10 @@
         <option value="all"${!picked.length?" selected":""}>${t("全部行业","All industries")}</option>
         ${picked.length>1?`<option value="multiple" selected disabled>${t("已多选行业","Multiple industries selected")}</option>`:""}
         ${d.demand.map(x=>`<option value="${x.id}"${picked.length===1&&picked[0]===x.id?" selected":""}>${esc(label(x.name))}</option>`).join("")}</select></label>`,
-      select("occupations",t("职业组","Occupation group"),["all",...pathway.occupationGroups],v=>v==="all"?t("全部职业","All occupations"):label(v)),
+      select("occupations",t("职业组","Occupation group"),occupationScopes,v=>{
+        if(v==="tasks") return t("任务卡所选职业组","Groups selected on task cards");
+        return v==="all"?t("全部职业","All occupations"):label(v);
+      },scope),
       `<div class="chip-row" role="group" aria-label="${t("多选行业","Select multiple industries")}">${d.demand.map(x=>chip("toggleIndustry",x.id,label(x.name),picked.includes(x.id))).join("")}</div>`)}
       ${grid(
         figure("map",t("招聘机会地图","Hiring opportunities"),t("2026Q2 · 横轴空缺率 · 纵轴用工同比","2026 Q2 · Vacancy rate (x) · Employment change year on year (y)"),
@@ -405,7 +415,7 @@
     return {...row,surplus,issues,match:!issues.length,missing};
   }
 
-  function intervals(rows, type) {
+  function intervals(rows, type, selectedIndustries) {
     const pay=type==="pay", target=pay?state.targetPay:state.maxHours;
     const step=pay?10000:10;
     const upper=Math.max(pay?50000:60,target, ...rows.map(r=>r[type+"75"] ?? 0));
@@ -415,11 +425,15 @@
     const position=v=>((v-low)/(high-low)*100);
     const shortTarget=pay?money(target):number(target)+t(" 小时"," hours");
     const targetName=pay?t("期望月薪","Target monthly pay"):t("期望每周工时上限","Weekly hours limit");
-    return `<div class="legend"><span><i style="background:#cdb5de"></i>P25–P75</span><span><i style="background:${rose}"></i>P50</span><span>${t("虚线","Dashed line")} · ${targetName} ${shortTarget}</span></div>
+    return `<div class="legend"><span><i style="background:#cdb5de"></i>P25–P75</span><span><i style="background:${rose}"></i>P50</span>
+      <span>${t("虚线","Dashed line")} · ${targetName} ${shortTarget}</span>
+      <span><i class="range-selection-key"></i>${t("已确认方向所属行业","Industry covering a confirmed option")}</span></div>
       ${rows.map(r=>{
+        const selected=selectedIndustries.has(r.id);
         const a=r[type+"25"], m=r[type+"50"], b=r[type+"75"];
         const tip=label(r.name)+" · "+[a,m,b].map(number).join(" / ")+" · "+(pay?t("港元／月","HKD/month"):t("小时／周","hours/week"));
-        return `<div class="range-lane"><span class="range-name">${esc(label(r.name))}</span><div class="range-track">
+        return `<div class="range-lane${selected?" range-highlight":""}"><span class="range-name">${esc(label(r.name))}
+          ${selected?`<span class="visually-hidden">${t("已确认方向所属行业","Industry covering a confirmed option")}</span>`:""}</span><div class="range-track">
           <span class="range-ref" style="left:${position(target)}%"></span>
           ${[a,b].every(Number.isFinite)?`<span class="range-band" style="left:${position(a)}%;width:${position(b)-position(a)}%" data-tip="${esc(tip)}"></span>`:""}
           ${Number.isFinite(m) ? `<button type="button" class="range-point" style="left:${position(m)}%" data-tip="${esc(tip)}" aria-label="${esc(tip+(pay?t(" · 带入预算"," · Use in budget"):""))}"
@@ -478,8 +492,10 @@
         ${state.pairs.length ? `<a class="secondary-link" href="#review">${t("前往复核","Review my options")}</a>`
           : chip("case","jia",t("载入嘉宁的演示方案","Load Jia Ning’s example"))}</div></section>`;
 
-    const chosen = d.demand.filter(r=>confirmed.some(pair=>pair.id===r.id));
-    const rows = d.pay.filter(r=>r.year===state.payYear&&chosen.some(item=>item.id===r.id)).map(candidate);
+    const selectedIndustries = new Set(confirmed.map(pair=>pair.id));
+    const chosen = d.demand.filter(r=>selectedIndustries.has(r.id));
+    const referenceRows = d.pay.filter(r=>r.year===state.payYear);
+    const rows = referenceRows.filter(r=>selectedIndustries.has(r.id)).map(candidate);
     const options = confirmed.map(pair=>{
       const vacancy = pathway.findVacancy(pair.id,pair.occupation);
       const market = chosen.find(row=>row.id===pair.id);
@@ -527,12 +543,14 @@
         ${budgetField("targetPay",t("期望月薪（港元）","Target monthly pay (HKD)"),1)}${budgetField("maxHours",t("期望每周工时上限","Weekly hours limit"),.1)}
         ${budgetField("targetSurplus",t("期望月结余（港元）","Target monthly surplus (HKD)"),1)}
         <button class="chip apply-budget" type="submit" id="apply-targets">${t("更新目标","Apply criteria")}</button></form>`
+      + hint(`两图展示全部 ${referenceRows.length} 个调查细分行业。清单涵盖 ${selectedIndustries.size} 个行业大类，对应 ${rows.length} 个高亮细分行业。`,
+        `Both charts show all ${referenceRows.length} surveyed industry segments. Your shortlist covers ${selectedIndustries.size} broad industries, which map to ${rows.length} highlighted segments.`)
       + grid(
         figure("pay-range",t("月薪分位区间","Monthly pay range"),t(`${state.payYear} 年 5–6 月 · 全职雇员 · 港元／月`,`May–June ${state.payYear} · Full-time employees · HKD/month`),
-          intervals(rows,"pay"),t("浅紫线段是第 25 至 75 百分位，保留行业中间一半的范围；圆点是中位数。点圆点可将该行业月薪带入预算。",
+          intervals(referenceRows,"pay",selectedIndustries),t("浅紫线段是第 25 至 75 百分位，保留行业中间一半的范围；圆点是中位数。点圆点可将该行业月薪带入预算。",
             "The pale band runs from the 25th to the 75th percentile, covering the middle half. The dot is the median. Select it to use that value in the budget.")),
         figure("hours-range",t("每周工时区间","Weekly hours range"),t(`${state.payYear} 年 5–6 月 · 全职雇员 · 小时／周`,`May–June ${state.payYear} · Full-time employees · Hours/week`),
-          intervals(rows,"hours"),t("虚线是你设定的每周工时上限。即使中位数达标，仍可用整个区间判断是否要在面试中先问加班。",
+          intervals(referenceRows,"hours",selectedIndustries),t("虚线是你设定的每周工时上限。即使中位数达标，仍可用整个区间判断是否要在面试中先问加班。",
             "The dashed line marks your weekly hours limit. Read the full range to decide whether to ask about overtime, even if the median fits.")),
         figure("budget",t("个人生活预算","Monthly budget"),t("可编辑示例 · 港元／月","Editable scenario · HKD per month"),
           `<form class="control-bar" data-budget-form>${budgetField("offer",t("Offer 月薪","Monthly offer"),1)}${budgetField("rent",t("每月房租","Monthly rent"),1)}
@@ -673,6 +691,11 @@
       ? selected.includes(id)?selected.filter(x=>x!==id):[...selected,id]
       : selected.length===1&&selected[0]===id?[]:[id];
   }
+  function loadExampleProfile() {
+    state.profile=pathway.exampleProfile();
+    state.taskOccupations=pathway.exampleTaskOccupations();
+    state.occupations="tasks";
+  }
   function action(e,el) {
     const key=el.dataset.action, value=el.dataset.value;
     if(key==="marketPeriod") state.marketPeriod=value;
@@ -696,12 +719,10 @@
     if(key==="bubble") choose(value,e.ctrlKey||e.metaKey);
     if(key==="toggleIndustry") choose(value,true);
     if(key==="offerMedian") state.offer=+value;
-    if(key==="profileExample") {
-      state.profile=pathway.exampleProfile();
-      state.occupations="Professionals";
-    }
+    if(key==="profileExample") loadExampleProfile();
     if(key==="clearProfile") {
       state.profile=pathway.emptyProfile();
+      state.taskOccupations={};
       state.occupations="all";
     }
     if(key==="profileTag") {
@@ -715,6 +736,12 @@
       }
     }
     if(key==="occupationGroup") state.occupations=value;
+    if(key==="taskOccupation") {
+      const [task,group] = value.split("|");
+      if(state.taskOccupations[task]===group) delete state.taskOccupations[task];
+      else state.taskOccupations[task]=group;
+      state.occupations="tasks";
+    }
     if(key==="vacancyCell") state.vacancyCell=value;
     if(key==="addPair" || key==="addBenchmark") {
       const [id,occupation] = value.split("|");
@@ -733,11 +760,13 @@
       location.hash="fit";
       return;
     }
-    if(key==="case") Object.assign(state,{
-      profile:pathway.exampleProfile(),pairs:pathway.examplePairs(true),occupations:"Professionals",
-      selected:[],payYear:2025,startYear:2016,vacancyMode:"count",
-      targetPay:25000,maxHours:42,targetSurplus:6000,offer:25000,rent:10000,living:6500,deduct:2000,
-    });
+    if(key==="case") {
+      loadExampleProfile();
+      Object.assign(state,{
+        pairs:pathway.examplePairs(true),selected:[],payYear:2025,startYear:2016,vacancyMode:"count",
+        targetPay:25000,maxHours:42,targetSurplus:6000,offer:25000,rent:10000,living:6500,deduct:2000,
+      });
+    }
     const focusKey = key==="addPair" || key==="addBenchmark" ? "vacancyCell:"+value : el.dataset.focus;
     render(focusKey);
     if(key==="occupationGroup") $("hiring").scrollIntoView({block:"start"});
@@ -745,8 +774,7 @@
 
   main.addEventListener("click",e=>{
     if(e.target.closest("[data-start-example]")) {
-      state.profile=pathway.exampleProfile();
-      state.occupations="Professionals";
+      loadExampleProfile();
       pathway.save(state);
       return;
     }
