@@ -113,13 +113,15 @@
 
   function bars(rows, opt = {}) {
     const max = opt.max ?? Math.max(1, ...rows.flatMap(r=>r.values.filter(Number.isFinite)));
+    const reference = Number.isFinite(opt.reference)
+      ? `<span class="bar-reference" style="left:${opt.reference/max*73}%" aria-hidden="true"></span>` : "";
     const draw = (v,i,cap) => Number.isFinite(v)
       ? `<span class="bar" style="width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? colors[i]}" data-tip="${esc((opt.labels?.[i] ?? "")+" "+(opt.format ?? number)(v))}"><b>${esc((opt.format ?? number)(v))}</b></span>`
       : '<span>—</span>';
     return `<div class="bars" role="group" aria-label="${esc(opt.label ?? t("条形图","Bar chart"))}">${rows.map(r=>{
       const tracks = opt.mirror
         ? `<div class="mirror">${r.values.map((v,i)=>`<span class="half">${draw(v,i,64)}</span>`).join("")}</div>`
-        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((v,i)=>draw(v,i,73)).join("")}</div>`;
+        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${reference}${r.values.map((v,i)=>draw(v,i,73)).join("")}</div>`;
       return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}</div>`;
   }

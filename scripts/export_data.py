@@ -39,6 +39,7 @@ def use_workbook(workbook):
     equity = records(workbook, "03_04")
     risk = records(workbook, "04_05")
     market_context = records(workbook, "00_新增官方数据")
+    pay_comparison = records(workbook, "00_深港行业工资") if "00_深港行业工资" in workbook.sheetnames else []
 
     def domain(name):
         return (row for row in quality if row["图表域"] == name)
@@ -122,6 +123,15 @@ def use_workbook(workbook):
     assert len(result["pay"]) == 180 and len(result["history"]) == 420
     assert all(result[key] for key in result)
     assert len({(r["id"], r["name"], r["year"]) for r in result["pay"]}) == len(result["pay"])
+    if pay_comparison:
+        result["payComparison"] = project(
+            (row for row in pay_comparison if row.get("行业")),
+            {"id": "代码", "nameZh": "行业", "nameEn": "英文行业", "sz": "深圳工资P50（人民币／年）",
+             "hk": "香港工资P50（港元／月）", "noteZh": "对应说明", "noteEn": "英文对应说明"},
+            numeric=("sz", "hk"),
+        )
+        assert result["payComparison"][0]["id"] == "all"
+        assert all(row["sz"] > 0 and row["hk"] > 0 for row in result["payComparison"])
     return result
 
 

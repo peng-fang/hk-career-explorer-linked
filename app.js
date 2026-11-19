@@ -157,8 +157,29 @@
           t("全港总体及分年龄失业率均未经季节性调整。年龄组沿用综合住户统计调查。","Overall and age-group rates are not seasonally adjusted. Age bands follow the General Household Survey."),rose,15))
       + appendix("risk-hk",t("查阅香港失业率历史、年龄及教育组","Explore Hong Kong unemployment history, age and education"),risk()) + `</section>
       <section aria-labelledby="pay-context-heading"><header class="subhead"><h2 id="pay-context-heading">${t("谁在参与劳动市场？行业收入怎么看？","Who participates in the labour market, and what do industries pay?")}</h2></header>`
-      + grid(participation)
+      + grid(participation, shenzhenHongKongPay())
       + appendix("market-wages",t("查阅香港各行业男女月收入","Explore Hong Kong industry earnings by sex"),equity()) + `</section>`;
+  }
+
+  function shenzhenHongKongPay() {
+    const data = d.payComparison ?? [];
+    const baseline = data.find(row=>row.id==="all");
+    if (!baseline) return "";
+    const industries = data.filter(row=>row.id!=="all");
+    const cities = [t("深圳","Shenzhen"),t("香港","Hong Kong")];
+    const title = t("深圳与香港的行业工资比较","Industry wages in Shenzhen and Hong Kong");
+    const index = row=>[row.sz/baseline.sz*100,row.hk/baseline.hk*100];
+    const bars = industries.map(row=>({name:t(row.nameZh,row.nameEn),values:index(row)}));
+    const amountTable = `<details class="appendix pay-amounts" id="pay-comparison-amounts"><summary>${t("查看原币种金额与行业对应","See local-currency amounts and industry matches")}</summary>
+      <div class="table-scroll" tabindex="0" aria-label="${t("深圳和香港的原币种工资中位数，可横向滚动","Salary medians in local currencies, scrolls horizontally")}">
+        <table class="compact-table"><thead><tr><th scope="col">${t("行业","Industry")}</th><th scope="col">${t("深圳 · 人民币／年","Shenzhen · CNY/year")}</th><th scope="col">${t("香港 · 港元／月","Hong Kong · HKD/month")}</th></tr></thead>
+        <tbody>${[baseline,...industries].map(row=>`<tr><th scope="row">${esc(t(row.nameZh,row.nameEn))}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th><td>${number(row.sz)}</td><td>${number(row.hk)}</td></tr>`).join("")}</tbody></table>
+      </div></details>`;
+    return figure("pay-comparison",title,t("2024 年 · 男女合计 · 各自全行业工资中位数 = 100","2024 · All employees · Each market’s overall median = 100"),
+      c.bars(bars,{labels:cities,colors:[purple,rose],max:Math.max(240,...bars.flatMap(row=>row.values)),reference:100,format:n=>number(Math.round(n)),label:title}) + amountTable,
+      t("120 表示该行业工资中位数比当地整体高 20%。深圳统计企业从业人员全年工资，香港统计 5–6 月调查期内的雇员月薪。两地薪酬构成和覆盖范围有差异，指数用于观察各行业在当地的相对水平。",
+        "An index of 120 means the industry median is 20% above its local overall median. Shenzhen measures annual pay of enterprise workers. Hong Kong measures employees’ monthly wages in its May–June survey. Wage components and coverage differ, so read the bars as relative industry positions."),
+      {key:legend([[cities[0],purple],[cities[1],rose]])+`<p class="mode-note pay-benchmark">${t("虚线为当地整体中位数（100）","Dashed line marks each market’s overall median (100)")}</p>`,full:true});
   }
 
   function structure() {
@@ -620,7 +641,10 @@
         ${hk("210-06401","香港分年龄失业率","Hong Kong unemployment by age")}${t("。内地为 2025 年 12 月，香港为第四季度、未经季调。",". Mainland figures refer to December 2025. Hong Kong figures refer to Q4, unadjusted.")}</li>
       <li><a href="https://genderdata.worldbank.org/en/economies/china">${t("世界银行 · 内地劳动参与率","World Bank · Mainland participation")}</a> ·
         <a href="https://genderdata.worldbank.org/en/economies/hong-kong-sar-china">${t("世界银行 · 香港劳动参与率","World Bank · Hong Kong participation")}</a>${t("。2025 年男女数据均为 ILO 15 岁及以上模型估计。",". The 2025 figures are ILO modelled estimates for ages 15 and above, by sex.")}</li>
-      <li>${t("行业收入的口径核对见","For the industry earnings coverage check, see")}
+      <li><a href="https://www.sz.gov.cn/attachment/1/1703/1703629/12735140.pdf">${t("深圳市人社局工资价位（第一部分，页 5、15–16）","Shenzhen wage benchmark report (Part I, pp. 5, 15–16)")}</a> ·
+        <a href="https://www.censtatd.gov.hk/wbr/B1050014/B10500142024AN24/att/en/B10500142024AN24.pdf">${t("香港政府统计处 2024 年收入及工时调查（表 6.10）","Hong Kong C&SD 2024 Annual Earnings and Hours Survey (Table 6.10)")}</a>${t("。深港指数为本地行业工资中位数除以本地全行业工资中位数，再乘 100。深圳是 2024 全年工资，香港是 2024 年 5–6 月调查期工资。仅配对范围较接近的行业。",
+          ". Each index divides an industry’s median wage by the same market’s overall median and multiplies by 100. Shenzhen covers full-year 2024 pay. Hong Kong covers the May–June survey period. Only broadly aligned industries are paired.")}</li>
+      <li>${t("分性别行业收入的口径核对见","For the coverage check on industry earnings by sex, see")}
         <a href="https://www.stats.gov.cn/sj/zxfbhjd/202605/t20260515_1963707.html">${t("国家统计局城镇单位年平均工资","NBS average annual wages in urban units")}</a> ·
         <a href="https://ilostat.ilo.org/topics/wages/">ILOSTAT</a> ·
         <a href="https://sle.ajcass.com/Admin/UploadFile/Issue/201911110002/2024/4/20240423101905WU_FILE_0.pdf">${t("中国城市劳动力调查（表 12）","China Urban Labour Survey (Table 12)")}</a>${t("。国家统计局表 2、5 按单位类型分组，ILOSTAT 的内地行业月平均收入只有男女合计，八城市调查发布的是税后平均月工资。香港收入图采用中位数。",
@@ -715,6 +739,7 @@
     const anchors = new Map([
       ["shortlist",["structure","pairs-heading"]], ["review",["structure","pairs-heading"]],
       ["risk",["markets","risk-heading"]], ["equity",["markets","pay-context-heading"]],
+      ["pay-comparison",["markets","pay-comparison"]],
     ]);
     const anchor = anchors.get(id);
     const match=anchor?.[0] ?? (Object.hasOwn(renderPage,id) ? id : "markets");
