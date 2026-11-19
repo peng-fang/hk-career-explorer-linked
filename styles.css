@@ -127,6 +127,15 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .bar-row .name { overflow-wrap: anywhere; }
 .bar-row .bars-track { display: flex; flex-direction: column; gap: 4px; position: relative; }
 .bar-row .bar { border-radius: 0 4px 4px 0; position: relative; height: 12px; min-width: 2px; }
+.chart-bar { border: 0; padding: 0; display: block; }
+.chart-bar[aria-pressed="true"] { box-shadow: inset 0 0 0 1px #341c48; }
+.chart-bar.is-muted { opacity: .45; }
+.split-track { display: flex; height: 12px; border-radius: 4px; overflow: hidden; }
+.split-values { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 9px; font-size: 11px; }
+#participation:has([data-action="participationFocus"]:hover) [data-series-key] { opacity: .23; }
+#participation:has([data-value="1985"]:hover) [data-series-key="1985"],
+#participation:has([data-value="2005"]:hover) [data-series-key="2005"],
+#participation:has([data-value="2025"]:hover) [data-series-key="2025"] { opacity: 1; }
 .bar-row .bar b { left: calc(100% + 5px); top: 50%; transform: translateY(-50%); position: absolute; font: 650 10px/1 system-ui, sans-serif; white-space: nowrap; }
 .wage-exchange input { width: 126px; min-height: 35px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); }
 .wage-exchange .mode-note { align-self: center; }
@@ -164,6 +173,7 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .heat th:first-child { min-width: 77px; }
 .heat td button { border: none; padding: 6px 4px; min-width: 35px; width: 100%; white-space: nowrap; border-radius: 3px; font-size: 11px; }
 .heat td button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #341c48; }
+.heat th.heat-active { background: #ebdcef; color: #4b2d5d; }
 .compact-table { min-width: 670px; }
 .compact-table .subcell { display: block; font-size: 11px; color: var(--muted); }
 .compact-table .status-cell { text-align: left; min-width: 124px; }
@@ -204,6 +214,12 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .chapter-actions .hero-button { margin: 0; }
 .secondary-link { color: var(--plum); font-weight: 700; text-underline-offset: 3px; text-decoration: underline; }
 button.secondary-link { padding: 0; border: 0; background: transparent; }
+.filter-menu { position: relative; }
+.filter-menu summary { padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--cream); font-size: 13px; }
+.filter-panel { position: absolute; z-index: 6; inset: calc(100% + 5px) auto auto 0; width: 270px; padding: 11px; border: 1px solid var(--line); background: var(--cream); border-radius: 9px; box-shadow: 0 6px 16px #341c481c; }
+.filter-panel fieldset { display: grid; gap: 2px; margin: 7px 0 0; padding: 0; border: 0; max-height: 240px; overflow: auto; }
+.filter-panel label { display: flex; align-items: flex-start; gap: 7px; padding: 4px 3px; cursor: pointer; font-size: 13px; }
+.filter-panel input { margin-top: 3px; accent-color: var(--plum); }
 .appendix { margin: 17px 0; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius); background: #fcf9f5; }
 .appendix > summary { font-weight: 750; color: var(--plum); }
 .appendix[open] > summary { margin-bottom: 13px; }
@@ -258,6 +274,8 @@ html[lang="en"] .compact-table th:first-child { min-width: 155px; }
   .topline { min-height: 55px; }
 }
 @media (max-width: 640px) {
+  .filter-menu[open] { flex-basis: 100%; }
+  .filter-panel { position: static; width: 100%; margin-top: 4px; box-shadow: none; }
   main, .footer { padding-inline: 12px; }
   .topline { margin-inline: 12px; font-size: 12px; gap: 6px; }
   .top-controls { gap: 5px; }

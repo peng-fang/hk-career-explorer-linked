@@ -55,7 +55,20 @@
     if (Number.isFinite(opt.refX) && opt.refX >= d.x[0] && opt.refX <= d.x[1]) {
       out += line(a.x(opt.refX),a.top,a.x(opt.refX),a.bottom,"refline");
     }
+    if (opt.shadeBetween) {
+      const [first, second] = sets.map(s => new Map(s.points.filter(p=>Number.isFinite(p[1])).map(p=>p.slice(0,2))));
+      const shared = [...first.keys()].filter(x=>second.has(x));
+      const edge = (keys, values) => keys.map(x=>`${a.x(x)},${a.y(values.get(x))}`);
+      out += `<polygon points="${[...edge(shared,first),...edge(shared.slice().reverse(),second)].join(" ")}" fill="${rose}" opacity=".14"/>`;
+    }
+    for (const marker of opt.markers ?? []) {
+      out += `<g ${mark(marker.tip,opt.action,marker.x,marker.x===opt.refX,`marker:${marker.x}`)}>`
+        + line(a.x(marker.x),a.top+8,a.x(marker.x),a.bottom,"refline")
+        + `<circle cx="${a.x(marker.x)}" cy="${a.top+7}" r="4.5" fill="${rose}"/></g>`;
+    }
     for (const s of sets) {
+      const opacity = opt.active && opt.active!==s.key ? .23 : 1;
+      out += `<g opacity="${opacity}"${s.key===undefined?"":` data-series-key="${esc(s.key)}"`}>`;
       let draw = "", pen = false;
       for (const [x,y] of s.points) {
         if (!Number.isFinite(y)) { pen = false; continue; }
@@ -63,21 +76,25 @@
         pen = true;
       }
       if (!opt.pointsOnly) {
-        out += `<path d="${draw}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
+        const path = `d="${draw}" fill="none" stroke-linejoin="round" stroke-linecap="round"`;
+        out += `<path ${path} stroke="${s.color}" stroke-width="2.4"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
+        if (opt.seriesAction) out += `<path ${path} style="stroke:transparent;stroke-width:14" ${mark(s.name,opt.seriesAction,s.key,opt.active===s.key,`series:${s.key}`)}/>`;
       }
       for (const [x,y,extra] of s.points) {
         if (!Number.isFinite(y)) continue;
         const tip = extra ?? `${s.name} · ${(opt.xFormat ?? number)(x)} · ${(opt.yFormat ?? number)(y)}`;
         const selected = x === opt.refX;
         const r = selected ? 4.7 : opt.pointsOnly ? 4 : s.points.length > 55 ? 2.1 : 3.1;
-        const action = !opt.canSelect || opt.canSelect(x) ? opt.action : null;
-        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,x)}/>`;
+        const action = opt.seriesAction ?? ((!opt.canSelect || opt.canSelect(x)) ? opt.action : null);
+        const value = opt.seriesAction ? s.key : x;
+        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,value,opt.seriesAction ? opt.active===s.key : undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
       }
+      out += "</g>";
     }
     return svg(w,h,opt.label,out);
   }
 
-  function stack(w, sets, years, year, action) {
+  function stack(w, sets, years, year) {
     const h = 246;
     const a = axes(w,h,{x:[years[0],years.at(-1)], y:[0,100], yFormat: percent,
       xTicks: years.filter((_,i)=>i%4===0 || i===years.length-1)});
@@ -102,8 +119,7 @@
         ];
         const tip = yearLabel(y) + "\n" + s.name + " " + percent(s.values[i]);
         const points = [...edge(high),...edge(base).reverse()].join(" ");
-        const focusKey = `${action}:${y}:${seriesIndex}`;
-        targets += `<polygon points="${points}" fill="transparent" ${mark(tip,y>=2016 ? action : null,y,undefined,focusKey)}/>`;
+        targets += `<polygon points="${points}" fill="transparent" ${mark(tip,"overviewBand",`${seriesIndex}|${y}`)}/>`;
       }
       base = high;
     }
@@ -113,15 +129,33 @@
 
   function bars(rows, opt = {}) {
     const max = opt.max ?? Math.max(1, ...rows.flatMap(r=>r.values.filter(Number.isFinite)));
-    const draw = (v,i,cap) => Number.isFinite(v)
-      ? `<span class="bar" style="width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? colors[i]}" data-tip="${esc((opt.labels?.[i] ?? "")+" "+(opt.format ?? number)(v))}"><b>${esc((opt.format ?? number)(v))}</b></span>`
-      : '<span>—</span>';
+    const draw = (row,i,cap) => {
+      const v = row.values[i];
+      if (!Number.isFinite(v)) return "<span>—</span>";
+      const value = (opt.format ?? number)(v);
+      const key = opt.keys?.[i] ?? row.key;
+      const pressed = opt.active===key;
+      const tip = [row.name,opt.labels?.[i],value].filter(Boolean).join(" · ");
+      const dimmed = opt.active && !pressed ? " is-muted" : "";
+      const style = `width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? colors[i]}`;
+      return opt.action
+        ? `<button type="button" class="bar chart-bar${dimmed}" style="${style}" aria-label="${esc(tip)}" aria-pressed="${pressed}" data-tip="${esc(tip)}" data-action="${opt.action}" data-value="${esc(key)}" data-focus="${esc(`${opt.action}:${opt.label}:${row.name}:${i}`)}"><b>${esc(value)}</b></button>`
+        : `<span class="bar" style="${style}" data-tip="${esc(tip)}"><b>${esc(value)}</b></span>`;
+    };
     return `<div class="bars" role="group" aria-label="${esc(opt.label ?? t("条形图","Bar chart"))}">${rows.map(r=>{
       const tracks = opt.mirror
-        ? `<div class="mirror">${r.values.map((v,i)=>`<span class="half">${draw(v,i,64)}</span>`).join("")}</div>`
-        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((v,i)=>draw(v,i,73)).join("")}</div>`;
+        ? `<div class="mirror">${r.values.map((_,i)=>`<span class="half">${draw(r,i,64)}</span>`).join("")}</div>`
+        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i,73)).join("")}</div>`;
       return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}</div>`;
+  }
+
+  function splitBars(rows, labels, palette) {
+    return `<div class="bars">${rows.map(r=>`<div class="bar-row"><span class="name">${esc(r.name)}</span>
+      <div class="split-row"><div class="split-track">${r.values.map((v,i)=>
+        `<span style="width:${v}%;background:${palette[i]}" data-tip="${esc(r.tips[i])}"></span>`).join("")}</div>
+      <div class="split-values">${r.values.map((v,i)=>`<span>${esc(labels[i])} ${percent(v)}</span>`).join("")}</div>
+      </div></div>`).join("")}</div>`;
   }
 
   function donut(rows) {
@@ -157,7 +191,7 @@
     }).join("")}</div>`;
   }
 
-  function bubbles(w, values, picked) {
+  function bubbles(w, values, picked, action = "bubble") {
     const h=254;
     const a=axes(w,h,{x:[.5,2.8],y:[-3,4],xTicks:[.5,1,1.5,2,2.5],yTicks:[-2,0,2,4],
       xFormat:percent,yFormat:percent,right:21,bottom:44});
@@ -168,7 +202,7 @@
     for(const r of values.slice().sort((a,b)=>b.openings-a.openings)) {
       const selected = picked.includes(r.id);
       const tip = `${r.name}\n${t("空缺率","Vacancy rate")} ${percent(r.rate*100)} · ${number(r.openings)}${t(" 个"," vacancies")}\n${t("用工同比","Employment YoY")} ${percent(r.yoy*100)}`;
-      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,"bubble",r.id,selected)}/>`;
+      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,action,r.id,selected)}/>`;
     }
     return svg(w,h,t("招聘机会地图，横轴职位空缺率，纵轴机构用工同比","Hiring opportunities. X: vacancy rate. Y: year-on-year employment change."),content);
   }
@@ -201,5 +235,5 @@
     return svg(w,h,t("个人生活预算瀑布图","Monthly budget waterfall chart"),content);
   }
 
-  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall};
+  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,splitBars,donut,treemap,bubbles,waterfall};
 })();

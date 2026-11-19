@@ -88,7 +88,7 @@
     }));
   }
 
-  const storageKey = "hk-career-explorer-v2";
+  const storageKey = "hk-career-explorer-linked";
   function load() {
     try {
       const saved = JSON.parse(sessionStorage.getItem(storageKey));

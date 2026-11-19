@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const storageKey = "hk-guide-language";
+  const storageKey = "hk-guide-linked-language";
   const isSupported = code => code === "zh-Hans" || code === "en";
   function readPreference() {
     try { return localStorage.getItem(storageKey); }

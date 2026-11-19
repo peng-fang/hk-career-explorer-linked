@@ -58,6 +58,14 @@ def industry_earnings():
     return rows
 
 
+def annual_unemployment():
+    # Hong Kong C&SD Table 210-06101, both sexes, published annual estimates.
+    with (ROOT / "data" / "hk-annual-unemployment.csv").open(encoding="utf-8", newline="") as file:
+        rows = [{"year": int(row["year"]), "rate": float(row["rate"])} for row in csv.DictReader(file)]
+    assert [row["year"] for row in rows] == list(range(1985, 2026))
+    return rows
+
+
 def use_workbook(workbook):
     compare = records(workbook, "00_00")
     all_jobs = records(workbook, "01_01")
@@ -88,7 +96,7 @@ def use_workbook(workbook):
     result = {
         "markets": project(
             (r for r in compare if r["view"] in {
-                "A_2010年龄对照", "F_行业35_早期", "G_行业35_最新",
+                "A_2010年龄对照", "F_行业35_早期", "G_行业35_最新", "H_中年组两地趋势",
             }),
             {"kind": "view", "region": "series", "label": "Age", "order": "x_order", "value": "value"},
             numeric=("order", "value"),
@@ -110,16 +118,21 @@ def use_workbook(workbook):
              "status": "employment_status_thousand", "work": "occupation_employment_thousand"},
             numeric=("year", "share", "status", "work"),
         ),
+        "industryEmploymentBySex": project(
+            (r for r in all_jobs if r["source_table"] == "employment_by_industry_annual"
+             and r["age_group"] == "Total" and r["industry"] != "Total" and r["sex"] in {"Female", "Male"}),
+            {"year": "year", "name": "industry", "sex": "sex", "people": "value"},
+            numeric=("year", "people"),
+        ),
         "risk": project(
             (r for r in risk if r["Chart"] in {"unemployment_quarterly_line", "crisis_recovery"}
              or r["Chart"] == "unemployment_age_heatmap" and r["AgeGroup"] in clean_ages
-             or r["Chart"] == "unemployment_education" and r["Education"] in {
-                 "Primary and below", "Secondary", "Post-secondary",
-             }),
+             or r["Chart"] == "unemployment_education"),
             {"kind": "Chart", "year": "Year", "quarter": "Quarter", "event": "Crisis",
              "age": "AgeGroup", "education": "Education", "relative": "RelativeQuarter", "value": "Value"},
             numeric=("year", "quarter", "relative", "value"),
         ),
+        "annualUnemployment": annual_unemployment(),
         "equity": project(
             (r for r in equity if r["sex"] in {"Female", "Male"} and (
                 r["group_type"] == "overall" and r["median_monthly_earnings_hkd"] is not None
@@ -148,6 +161,7 @@ def use_workbook(workbook):
     }
     assert len(result["demand"]) == 10 and len(result["occupations"]) == 90
     assert len(result["pay"]) == 180 and len(result["history"]) == 420
+    assert len(result["industryEmploymentBySex"]) == 288
     assert all(result[key] for key in result)
     assert len({(r["id"], r["name"], r["year"]) for r in result["pay"]}) == len(result["pay"])
     if pay_comparison:
