@@ -229,7 +229,10 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .range-point::after { content: ""; position: absolute; inset: -6px; }
 .range-value { position: absolute; top: 50%; transform: translate(8px, -50%); color: var(--ink); background: #fffdf9e8; font: 660 10px/1.3 system-ui, sans-serif; pointer-events: none; }
 .range-value.left { transform: translate(calc(-100% - 8px), -50%); }
-.range-ref { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #876890; }
+.range-ref, .legend .range-target-swatch { border-left: 3px dashed #155e59; }
+.range-ref { position: absolute; inset-block: 0; transform: translateX(-50%); pointer-events: none; }
+.legend .range-target-swatch { width: 0; height: 18px; border-radius: 0; }
+.range-target-legend { color: #155e59; font-weight: 700; }
 .range-axis { display: flex; justify-content: space-between; padding: 4px 0 0; margin-left: 176px; color: var(--muted); font-size: 10px; }
 .decision { padding: 14px 16px; margin-bottom: 16px; background: #e9e0ed; border: 1px solid #ddcde2; border-radius: 12px; }
 .decision strong { color: var(--plum); font-size: 16px; }

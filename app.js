@@ -488,7 +488,7 @@
     const shortTarget=pay?money(target):number(target)+t(" 小时"," hours");
     const targetName=pay?t("期望月薪","Target monthly pay"):t("期望每周工时上限","Weekly hours limit");
     return `<div class="legend"><span><i style="background:#cdb5de"></i>P25–P75</span><span><i style="background:${rose}"></i>P50</span>
-      <span>${t("虚线","Dashed line")} · ${targetName} ${shortTarget}</span>
+      <span class="range-target-legend"><i class="range-target-swatch" aria-hidden="true"></i>${targetName} ${shortTarget}</span>
       <span><i class="range-selection-key"></i>${t("已确认方向所属行业","Industry covering a confirmed option")}</span></div>
       ${orderedRows.map(r=>{
         const selected=selectedIndustries.has(r.id);
@@ -496,8 +496,8 @@
         const tip=label(r.name)+" · "+[a,m,b].map(number).join(" / ")+" · "+(pay?t("港元／月","HKD/month"):t("小时／周","hours/week"));
         return `<div class="range-lane${selected?" range-highlight":""}"><span class="range-name">${esc(label(r.name))}
           ${selected?`<span class="visually-hidden">${t("已确认方向所属行业","Industry covering a confirmed option")}</span>`:""}</span><div class="range-track">
-          <span class="range-ref" style="left:${position(target)}%"></span>
           ${[a,b].every(Number.isFinite)?`<span class="range-band" style="left:${position(a)}%;width:${position(b)-position(a)}%" data-tip="${esc(tip)}"></span>`:""}
+          <span class="range-ref" aria-hidden="true" style="left:${position(target)}%"></span>
           ${Number.isFinite(m) ? `<button type="button" class="range-point" style="left:${position(m)}%" data-tip="${esc(tip)}" aria-label="${esc(tip+(pay?t(" · 带入预算"," · Use in budget"):""))}"
               ${pay?` data-action="offerMedian" data-value="${m}" data-focus="${esc("offerMedian:"+m+":"+r.name)}"`:""}></button>
             <span class="range-value${position(m)>68?" left":""}" style="left:${position(m)}%">${number(m)}</span>` : `<span class="range-value">${t("缺测","No data")}</span>`}
