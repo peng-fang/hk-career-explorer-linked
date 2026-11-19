@@ -33,13 +33,14 @@
   };
   const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,...saved} = pathway.load();
   const state = {
-    marketPeriod:"latest", overviewYear:2025, marketRegion:"", overviewIndustry:null,
+    marketPeriod:"latest", marketAge:"over", overviewYear:2025, marketRegion:"", overviewIndustry:null,
     wageRate:defaultWageRate, wageCurrency:"CNY", wageSort:"hk", wageIndustry:"",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
     industryDetails:[], budgetScope:true,
     ...saved,
+    marketIndustry:saved.marketIndustry ?? wageAgeGroups[saved.wageIndustry] ?? "",
   };
   const aliases = {
     "Manufacturing":"制造业","Construction":"建筑业","Import/export & wholesale":"进出口及批发",
@@ -91,39 +92,33 @@
 
   function markets() {
     const snapshot = d.markets.filter(r=>r.kind==="A_2010年龄对照");
-    const industryAge = d.markets.filter(r=>["F_行业35_早期","G_行业35_最新"].includes(r.kind));
-    const current = industryAge.filter(r=>r.kind===(state.marketPeriod==="early"?"F_行业35_早期":"G_行业35_最新"));
-    const ageMax = Math.ceil(Math.max(5,...snapshot.map(r=>r.value).filter(Number.isFinite))/5)*5;
-    const industryMax = Math.ceil(Math.max(10,...industryAge.map(r=>r.value).filter(Number.isFinite).map(v=>100-v))/10)*10;
-    const paired = rows => [...by(rows,"order")].sort(([a],[b])=>a-b).map(([,rs])=>({
-      key:rs[0].label, name:label(rs[0].label), values:["内地","香港"].map(region=>rs.find(r=>r.region===region)?.value),
+    const ages = [...by(snapshot,"order").keys()].sort((a,b)=>a-b);
+    const ageNames = new Map(snapshot.map(row=>[row.order,row.label.replace("-","–")]));
+    const ageRange = order=>parseInt(ageNames.get(order),10)<35 ? "under" : "over";
+    const first35 = ages.find(order=>ageRange(order)==="over");
+    const regionEntries = [["内地",label("内地"),purple],["香港",label("香港"),rose]];
+    const sets = regionEntries.map(([key,name,color],index)=>({
+      ...lineSet(name,snapshot.filter(row=>row.region===key).sort((a,b)=>a.order-b.order)
+        .map(row=>[row.order,row.value,`${name} · ${ageNames.get(row.order)} · ${percent(row.value)}`]),color,index===1),
+      key, opacity:state.marketRegion && state.marketRegion!==key ? 0.45 : 1, pointValue:ageRange,
     }));
-    const aged35AndOver = paired(current).map(row=>({
-      ...row, values:row.values.map(value=>Number.isFinite(value) ? 100-value : value),
-      highlighted:row.key===wageAgeGroups[state.wageIndustry],
+    const agePlot = viz("workforce-age",width=>c.series(width,sets,{
+      height:width>=390 ? 310 : 238,
+      x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
+      xFormat:order=>ageNames.get(order), yFormat:percent, yTicks:[0,5,10,15], right:24,
+      highlightX:state.marketAge==="under" ? [ages[0],first35-0.5] : [first35-0.5,ages.at(-1)],
+      action:"marketAge", label:t("两地就业人口年龄分布","Age distribution of workers in the two markets"),
     }));
-    const palette = [purple,rose], regionKeys = ["内地","香港"], regions = regionKeys.map(label);
-    const active = state.marketRegion;
-    const keys = where => filterLegend("marketRegion",regionKeys.map((key,i)=>[key,regions[i],palette[i]]),active,where);
-    const regionPlot = {action:"marketRegion",keys:regionKeys,active,colors:palette,labels:regions,format:percent};
-    const era = state.marketPeriod==="early"
-      ? t("内地 2010 年 · 香港 2011 年","Mainland 2010 · Hong Kong 2011")
-      : t("内地 2020 年 · 香港 2021 年","Mainland 2020 · Hong Kong 2021");
     return heading(pages[0],0,"market-compare")
       + `<div class="grid wide-pair market-ages">`
       + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
-          c.bars(paired(snapshot),{...regionPlot,mirror:true,max:ageMax,ticks:[-ageMax,-ageMax/2,0,ageMax/2,ageMax],
-            label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
-          t("左侧是内地，右侧是香港。各年龄组占当地就业人口的比例沿用原表分母。图中从 20 岁起列示，两地对就业的统计定义有差异。",
-            "Mainland China is on the left and Hong Kong is on the right. Shares use the original workforce totals. The chart shows ages 20 and over. Employment definitions differ by market."),
-          {key:keys("ages")})
-      + figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
-          c.bars(aged35AndOver,{...regionPlot,max:industryMax,ticks:[0,industryMax/3,industryMax*2/3,industryMax],
-            highlightLabel:t("所选工资行业所属大类","Group covering the selected wage industry"),
-            label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
-          t("占比以各地各行业就业人数为分母，由 100% 减去 35 岁以下占比得到。两地统计时点相差一年，内地行业数据含项目估计。点击地区可同步突出两张年龄图。",
-            "Shares use each industry’s workforce as the denominator and equal 100% minus the under-35 share. Snapshots are one year apart, and Mainland figures include project estimates. Select a market to highlight it in both age charts."),
-          {key:keys("industry-age"),control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`})
+          agePlot + `<p class="mode-note market-age-band">${state.marketAge==="under"
+            ? t("已突出图中 20–34 岁组。","Highlighted here: ages 20–34.")
+            : t("已突出图中 35 岁及以上各组。","Highlighted here: ages 35 and over.")}</p>`,
+          t("每个点代表一个年龄组，占比以当地就业人口为分母。图中从 20 岁起列示，两地就业定义有差异。点选年龄组可切换右图的年龄范围。",
+            "Each point represents an age group as a share of local employment. The chart starts at age 20, and employment definitions differ by market. Select a point to switch the age band in the industry chart."),
+          {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
+      + marketIndustryAge()
       + `</div>`
       + marketUnemployment()
       + shenzhenHongKongPay()
@@ -131,6 +126,55 @@
         <div class="chapter-actions"><a class="primary-link" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>
         <button type="button" class="secondary-link" data-action="startOwn"${state.pairs.length ? ' aria-describedby="own-search-note"' : ""}>${t("用我的背景探索","Explore with my own background")}</button></div>
         ${state.pairs.length ? `<p id="own-search-note">${t("从这里开始会清空已选方向和对应的面试备注。","Starting here clears your shortlist and its interview notes.")}</p>` : ""}</div>`;
+  }
+
+  function marketIndustryAge() {
+    const ageLabel = band=>band==="under" ? t("35 岁以下","Under 35") : t("35 岁及以上","35 and over");
+    const periods = {
+      early:t("内地 2010／香港 2011","Mainland 2010 / Hong Kong 2011"),
+      latest:t("内地 2020／香港 2021","Mainland 2020 / Hong Kong 2021"),
+    };
+    const kind = state.marketPeriod==="early" ? "F_行业35_早期" : "G_行业35_最新";
+    const rows = [...by(d.markets.filter(row=>row.kind===kind),"label")].map(([key,group])=>{
+      const share = region=>{
+        const value = group.find(row=>row.region===region)?.value;
+        return state.marketAge==="under" ? value : 100-value;
+      };
+      const mainland = share("内地"), hk = share("香港");
+      return {key, name:label(key), mainland, hk, gap:Number((hk-mainland).toFixed(2))};
+    }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+    const gapFormat = new Intl.NumberFormat(language.code(),{minimumFractionDigits:1,maximumFractionDigits:1,signDisplay:"exceptZero"});
+    const gapLabel = gap=>gapFormat.format(gap).replace(/^-/,"−");
+    const comparison = row=>t(`内地 ${percent(row.mainland)} · 香港 ${percent(row.hk)}`,`Mainland ${percent(row.mainland)} · Hong Kong ${percent(row.hk)}`);
+    const title = t("哪些行业的年龄结构差异最大？","Which industries have the biggest age gaps?");
+    const chart = `<div class="industry-gap-chart" role="group" aria-label="${esc(title)}">
+      <div class="industry-gap-row industry-gap-axis" aria-hidden="true">
+        <span class="industry-gap-track"><span>−30</span><span>0</span><span>+30</span></span>
+        <span class="industry-gap-number">${t("百分点","pp")}</span>
+      </div>
+      ${rows.map(row=>{
+        const tip = `${row.name} · ${comparison(row)} · ${gapLabel(row.gap)} ${t("个百分点","percentage points")}`;
+        return `<button type="button" class="industry-gap-row" data-action="marketIndustry" data-value="${esc(row.key)}"
+          data-focus="marketIndustry:${esc(row.key)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${state.marketIndustry===row.key}">
+          <span class="industry-gap-name">${esc(row.name)}</span>
+          <span class="industry-gap-track" aria-hidden="true"><i class="industry-gap-bar${row.gap<0?" is-negative":""}" style="--gap-width:${Math.abs(row.gap)/30*50}%"></i></span>
+          <span class="industry-gap-number">${gapLabel(row.gap)}</span>
+        </button>`;
+      }).join("")}
+    </div>`;
+    const picked = rows.find(row=>row.key===state.marketIndustry);
+    const hasWage = picked && Object.values(wageAgeGroups).includes(picked.key);
+    const wageLink = `<a class="secondary-link" href="#pay-comparison" data-scroll="pay-comparison">${t("查看对应行业的深港工资","See corresponding Shenzhen–Hong Kong wages")}</a>`;
+    const detail = picked ? `<div class="industry-gap-detail" role="status"><strong>${esc(picked.name)}</strong> · ${comparison(picked)}
+      <p>${hasWage ? wageLink : t("现有深港工资图缺少这一大类的对应行业数据。","The wage chart has no corresponding industry data for this group.")}</p></div>` : "";
+    return figure("industry-age",title,periods[state.marketPeriod]+" · "+ageLabel(state.marketAge),
+      chart+detail,
+      t("条向右表示香港占比较高，向左表示内地占比较高。分母为各地该行业的就业人口。两地相差一年，内地部分数值为项目估计。",
+        "Bars point right when Hong Kong has the higher share and left when Mainland China does. Shares are within each local industry. Snapshots are one year apart. Some Mainland values are project estimates."),
+      {control:`<div class="card-controls market-age-controls">
+        ${select("marketPeriod",t("统计时期","Reference period"),Object.keys(periods),period=>periods[period])}
+        ${select("marketAge",t("年龄范围","Age band"),["over","under"],ageLabel)}
+      </div>`});
   }
 
   function marketUnemployment() {
@@ -161,7 +205,6 @@
     const amount = value => number(Math.round(value) || 0);
     const sz = t("深圳","Shenzhen"), hk = t("香港","Hong Kong");
     const difference = t("差额（香港 − 深圳）","Gap (Hong Kong − Shenzhen)");
-    const unitColumns = [cnyUnit,hkdUnit].map(value=>`<th scope="col"><span class="wage-value">${value}</span></th>`).join("");
     const title = t("深圳与香港的行业月薪中位数","Median monthly wages in Shenzhen and Hong Kong");
     const sortLabels = {
       hk:t("香港月薪","Hong Kong wage"), sz:t("深圳月薪","Shenzhen wage"), gap:t("两地差额","Wage gap"),
@@ -185,9 +228,10 @@
       </div>
       ${rows.map(row=>{
         const active = state.wageIndustry===row.id;
+        const related = !state.wageIndustry && state.marketIndustry===wageAgeGroups[row.id];
         const tip = [row.name, `${sz} ${amount(row.sz)} ${unit}`, `${hk} ${amount(row.hk)} ${unit}`,
           `${difference} ${gapText(row.gap)} ${unit}`, row.note].filter(Boolean).join("\n");
-        return `<button type="button" class="wage-chart-row wage-choice" data-action="wageIndustry" data-value="${row.id}"
+        return `<button type="button" class="wage-chart-row wage-choice${related?" wage-related":""}" data-action="wageIndustry" data-value="${row.id}"
           data-focus="wageIndustry:${row.id}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${active}">
           <span class="wage-industry">${esc(row.name)}</span>
           <span class="wage-track" style="--sz-position:${position(row.sz)};--hk-position:${position(row.hk)}" aria-hidden="true">
@@ -208,28 +252,20 @@
       ${chip("resetWageRate","default",t("恢复默认","Reset to default"))}
       <p class="mode-note"><a class="secondary-link" href="${wageRateSource}">${t(`2024 年平均汇率（1 人民币 = ${defaultWageRate} 港元）`,`2024 average exchange rate (CNY 1 = HKD ${defaultWageRate})`)}</a></p>
       </form>`;
-    const amountTable = `<div class="table-scroll" tabindex="0" aria-label="${title}">
-      <table class="compact-table wage-table">
-        <colgroup><col></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup>
-        <thead><tr><th scope="col" rowspan="2">${t("行业","Industry")}</th><th scope="colgroup" colspan="2">${sz}</th><th scope="colgroup" colspan="2">${hk}</th></tr>
-        <tr>${unitColumns}${unitColumns}</tr></thead>
-        <tbody>${data.map(row=>{
-          const name = row.id==="all" ? t("全行业","All covered industries") : t(row.nameZh,row.nameEn);
-          const szMonthly = row.sz/12;
-          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td><span class="wage-value">${amount(value)}</span></td>`).join("")}</tr>`;
-        }).join("")}</tbody></table></div>`;
     const key = `<div class="legend wage-key" aria-label="${unit}">
       <span><i style="background:${purple}"></i>${sz}</span><span><i class="wage-key-circle" style="background:${rose}"></i>${hk}</span>
       <span>${unit}</span>
     </div>`;
     const selected = rows.find(row=>row.id===state.wageIndustry);
-    const ageChartLink = `<a class="secondary-link" href="#industry-age" data-scroll="industry-age">${t("行业年龄占比图","the industry age chart")}</a>`;
-    const selection = selected ? `<p class="mode-note wage-selection">${esc(selected.note)} ${t(`对应大类已在${ageChartLink}中标出。`,`The corresponding group is highlighted in ${ageChartLink}.`)}</p>` : "";
+    const ageChartLink = `<a class="secondary-link" href="#industry-age" data-scroll="industry-age">${t("查看对应大类的年龄差异","See the age gap for this industry group")}</a>`;
+    const selection = selected ? `<p class="mode-note wage-selection">${esc(selected.note)} ${ageChartLink}</p>` : "";
+    const groupName = label(state.marketIndustry);
+    const related = !selected && rows.some(row=>wageAgeGroups[row.id]===state.marketIndustry);
+    const groupNote = related ? hint(`已突出「${groupName}」对应的工资行业。`,`Highlighted wage industries for ${groupName}.`) : "";
     return figure("pay-comparison",title,t("2024 年 · 男女合计 · 金额取整","2024 · Both sexes combined · Rounded to whole currency units"),
-      fx + key + chart + selection
-        + `<details class="wage-details" id="wage-details" data-persist-open><summary>${t("查看原始金额与行业对应","View source amounts and industry coverage")}</summary>${amountTable}</details>`,
-      t("点选行业，可在行业年龄占比图中查看对应大类。深圳采用全年工资中位数除以 12，香港采用 5–6 月调查期的月薪中位数。两地金额按同一汇率换算。行业范围差异见各行说明。专业及商业服务、社会及个人服务缺少可对应的整体中位数。",
-        "Select an industry to see its broader group in the industry age chart. Shenzhen’s annual median is divided by 12. Hong Kong uses the median monthly wage from its May–June survey. Both use the same exchange rate. See row notes for differences in industry coverage. Comparable overall medians are unavailable for professional and business services and for social and personal services."));
+      fx + key + groupNote + chart + selection,
+      t("点选行业可查看口径说明，并在年龄差值图中突出对应大类。深圳采用全年工资中位数除以 12，香港采用 5–6 月调查期的月薪中位数。两地金额按同一汇率换算。专业及商业服务、社会及个人服务缺少可对应的整体中位数。",
+        "Select an industry to see coverage notes and highlight its broader group in the age gap chart. Shenzhen’s annual median is divided by 12. Hong Kong uses the median monthly wage from its May–June survey. Both use the same exchange rate. Comparable overall medians are unavailable for professional and business services and for social and personal services."));
   }
 
   function structure() {
@@ -756,6 +792,7 @@
       ["shortlist",["structure","pairs-heading"]], ["review",["structure","pairs-heading"]],
       ["hiring",["structure","hiring"]], ["profile-heading",["structure","profile-heading"]],
       ["market-compare",["markets","market-compare"]], ["risk",["markets","risk-heading"]],
+      ["ages",["markets","ages"]], ["industry-age",["markets","industry-age"]],
       ["equity",["markets","pay-comparison"]],
       ["pay-comparison",["markets","pay-comparison"]],
     ]);
@@ -789,9 +826,16 @@
       location.hash="structure";
       return;
     }
-    if(key==="marketPeriod") state.marketPeriod=value;
+    if(key==="marketAge") state.marketAge=value;
     if(key==="marketRegion") state.marketRegion=state.marketRegion===value?"":value;
-    if(key==="wageIndustry") state.wageIndustry=state.wageIndustry===value?"":value;
+    if(key==="marketIndustry") {
+      state.marketIndustry=state.marketIndustry===value?"":value;
+      state.wageIndustry="";
+    }
+    if(key==="wageIndustry") {
+      state.wageIndustry=state.wageIndustry===value?"":value;
+      state.marketIndustry=wageAgeGroups[state.wageIndustry] ?? "";
+    }
     if(key==="resetWageRate") state.wageRate=defaultWageRate;
     if(key==="overviewYear") {
       const [year,industry] = value.split("|").map(Number);

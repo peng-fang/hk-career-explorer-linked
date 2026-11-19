@@ -72,14 +72,30 @@ main:has(.market-ages) { max-width: none; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
 .grid.wide-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr)); }
 .budget-history { margin-top: 15px; }
-.market-ages { --value-gutter: 40px; }
 #pay-comparison, .market-next { margin-block-start: 15px; }
-.market-ages #ages .bar-row { grid-template-columns: 48px minmax(0, 1fr); }
-.market-ages #ages .mirror { padding-inline: var(--value-gutter); }
-.market-ages #industry-age .bar-row { grid-template-columns: minmax(88px, 30%) minmax(0, 1fr); }
-.market-ages #industry-age .bars-track { margin-inline-end: var(--value-gutter); }
-.market-ages .bar-scale { grid-column: 2; margin-inline-end: var(--value-gutter); }
-.market-ages #ages .bar-scale { margin-inline-start: var(--value-gutter); }
+.market-age-controls { margin-top: 4px; }
+.age-range-highlight { fill: #f0e4f2; }
+.market-age-band { margin-top: 5px; }
+.industry-gap-row {
+  display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) minmax(98px, 43%) 42px;
+  align-items: center; gap: 8px; min-height: 36px; padding: 3px 6px; text-align: start; font-size: 12px;
+}
+.industry-gap-row[aria-pressed] { color: var(--ink); background: transparent; border: 0; border-top: 1px solid #eee5e8; }
+.industry-gap-row[aria-pressed="true"], .industry-gap-row[aria-pressed]:hover { background: #f1e7f4; }
+.industry-gap-row[aria-pressed="true"] { box-shadow: inset 3px 0 var(--plum); font-weight: 750; }
+.industry-gap-row:focus-visible { outline-offset: -2px; }
+.industry-gap-axis { color: var(--muted); font-size: 11px; min-height: 22px; }
+.industry-gap-name { overflow-wrap: anywhere; }
+.industry-gap-track { grid-column: 2; display: flex; position: relative; justify-content: space-between; align-self: stretch; min-height: 20px; }
+.industry-gap-axis .industry-gap-track span:nth-child(2) { position: absolute; left: 50%; transform: translateX(-50%); }
+.industry-gap-row[aria-pressed] .industry-gap-track::before {
+  content: ""; position: absolute; inset: 0 auto 0 50%; border-inline-start: 1px solid #aa98ad;
+}
+.industry-gap-bar { position: absolute; top: 50%; transform: translateY(-50%); left: 50%; width: var(--gap-width); height: 11px; background: var(--rose); }
+.industry-gap-bar.is-negative { left: auto; right: 50%; background: var(--plum); }
+.industry-gap-number { grid-column: 3; justify-self: end; font-variant-numeric: tabular-nums; }
+.industry-gap-detail { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
+.industry-gap-detail p { margin-top: 3px; }
 .span-full { grid-column: 1 / -1; }
 .card { border-radius: var(--radius); border: 1px solid var(--line); background: var(--cream); min-width: 0; padding: 18px; display: flex; flex-direction: column; }
 .card-head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 5px 12px; margin-bottom: 9px; }
@@ -142,7 +158,7 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .wage-chart-axis { color: var(--muted); font-size: 11px; }
 .wage-choice { border: 0; border-block-start: 1px solid #eee5e8; background: transparent; color: var(--ink); min-height: 50px; }
 .wage-choice:hover { background: #f7eff6; }
-.wage-choice[aria-pressed="true"] { background: #f1e7f4; box-shadow: inset 3px 0 var(--plum); font-weight: 750; }
+.wage-choice:is([aria-pressed="true"], .wage-related) { background: #f1e7f4; box-shadow: inset 3px 0 var(--plum); font-weight: 750; }
 .wage-choice:focus-visible { position: relative; z-index: 1; outline-offset: -2px; }
 .wage-track { position: relative; margin-inline: 32px; min-height: 48px; }
 .wage-ticks { grid-column: 2; min-height: 22px; }
@@ -165,17 +181,6 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .wage-hk b { top: 12px; }
 .wage-gap { grid-column: 3; justify-self: end; font-variant-numeric: tabular-nums; }
 .wage-selection { margin: 8px 6px; }
-.wage-details { margin-top: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; }
-.wage-details summary { cursor: pointer; color: var(--plum); font-size: 13px; font-weight: 680; }
-.wage-details[open] summary { margin-bottom: 8px; }
-.wage-table { table-layout: fixed; }
-.wage-table .wage-amount-column { width: 17%; }
-.wage-table th[scope="colgroup"], .wage-table thead tr:last-child th, .wage-table tbody td { text-align: center; }
-.wage-table th[scope="colgroup"]:last-child,
-.wage-table thead tr:last-child th:nth-child(3),
-.wage-table tbody td:nth-child(4) { border-inline-start: 1px solid var(--line); }
-.wage-table .wage-value { display: inline-block; width: 78px; text-align: right; white-space: nowrap; }
-.wage-table tbody th, .wage-table tbody td { vertical-align: top; }
 .bar-single .bar { height: 14px; }
 .bar-row .mirror { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; align-items: center; }
 .mirror .half { display: flex; min-width: 0; }
@@ -318,6 +323,12 @@ html[lang="en"] .compact-table th:first-child { min-width: 155px; }
   .wage-track { grid-column: 1 / -1; grid-row: 2; }
   .range-lane { grid-template-columns: minmax(0, 104px) minmax(0, 1fr); }
   .range-axis { margin-left: 112px; }
+}
+@media (max-width: 450px) {
+  .industry-gap-row { grid-template-columns: minmax(0, 1fr) 42px; gap: 0 8px; }
+  .industry-gap-track { grid-column: 1; grid-row: 2; min-height: 15px; }
+  .industry-gap-number { grid-column: 2; grid-row: 1 / span 2; }
+  .industry-gap-axis .industry-gap-track, .industry-gap-axis .industry-gap-number { grid-row: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }

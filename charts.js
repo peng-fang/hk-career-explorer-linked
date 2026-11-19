@@ -50,12 +50,18 @@
       y: opt.y ?? [Math.min(0,...ys), Math.ceil(Math.max(...ys) / 5)*5],
     };
     const a = axes(w,h,d);
-    let out = a.grid;
+    let out = "";
+    if (opt.highlightX) {
+      const [start,end] = opt.highlightX.map(a.x);
+      out += `<rect class="age-range-highlight" x="${start}" y="${a.top}" width="${end-start}" height="${a.bottom-a.top}" aria-hidden="true"/>`;
+    }
+    out += a.grid;
     if (Number.isFinite(opt.refY)) out += line(a.left,a.y(opt.refY),a.right,a.y(opt.refY),"refline");
     if (Number.isFinite(opt.refX) && opt.refX >= d.x[0] && opt.refX <= d.x[1]) {
       out += line(a.x(opt.refX),a.top,a.x(opt.refX),a.bottom,"refline");
     }
     for (const s of sets) {
+      out += `<g opacity="${s.opacity ?? 1}">`;
       let draw = "", pen = false;
       for (const [x,y] of s.points) {
         if (!Number.isFinite(y)) { pen = false; continue; }
@@ -71,6 +77,7 @@
         const action = !opt.canSelect || opt.canSelect(x) ? opt.action : null;
         out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,s.pointValue?.(x) ?? x,undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
       }
+      out += "</g>";
     }
     return svg(w,h,opt.label,out);
   }
@@ -133,7 +140,7 @@
       const tracks = opt.mirror
         ? `<div class="mirror">${r.values.map((_,i)=>`<span class="half">${draw(r,i)}</span>`).join("")}</div>`
         : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i)).join("")}</div>`;
-      return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${esc(opt.highlightLabel ?? t("所选方向所属大类","Category covering a pick"))}</span>` : ""}</span>${tracks}</div>`;
+      return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}${axis}</div>`;
   }
 
