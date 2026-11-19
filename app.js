@@ -38,11 +38,12 @@
     "Manufacturing":"制造业","Construction":"建筑业","Import/export & wholesale":"进出口及批发",
     "Retail & accommodation":"零售、住宿及餐饮","Transportation & information":"运输及资讯",
     "Finance & professional":"金融、地产及商务","Public & social services":"公共及社会服务","Other industries":"其他行业",
-    "Financing, insurance, real estate, professional and business services":"金融、保险、地产及商务",
     "Import/export trade and wholesale":"进出口及批发",
+    "Retail":"零售业","Accommodation and food services":"住宿及餐饮",
+    "Financing and insurance":"金融及保险",
+    "Real estate and professional and business services":"地产、专业及商业服务",
     "Public administration, social and personal services":"公共行政、社会及个人服务",
-    "Retail, accommodation and food services":"零售、住宿及餐饮",
-    "Transportation, storage, postal and courier services, information and communications":"运输、邮政及资讯",
+    "Transportation, storage, postal and courier services, information and communications":"运输、仓储、邮政及资讯通讯",
     "Employees":"雇员","Employers":"雇主","Self-employed":"自雇","Unpaid family workers":"无酬家庭从业者",
     "Managers":"经理","Professionals":"专业人员","Associate professionals":"辅助专业人员",
     "Clerical support workers":"文书支援人员","Services and sales workers":"服务及销售人员",
@@ -292,7 +293,6 @@
     const overall = d.equity.filter(r=>r.kind==="overall");
     const sexes = ["Female","Male"];
     const sexNames = [t("女性","Women"),t("男性","Men")], palette=[rose,purple], keys=legend(sexNames.map((n,i)=>[n,palette[i]]));
-    const bands = snapshot.filter(r=>r.kind==="industry");
     const ages = snapshot.filter(r=>r.kind==="age_group");
     const getOverall = sex => snapshot.find(r=>r.kind==="overall"&&r.sex===sex)?.pay;
     const genderSets = (rows,field,x) => sexes.map((sex,i)=>
@@ -300,9 +300,9 @@
         field==="participation"?`${sexNames[i]} · ${ageLabel(r.name)} · ${percent(r[field])}`: `${sexNames[i]} · ${yearLabel(r.year)} · ${money(r[field])}`
       ]).sort((a,b)=>a[0]-b[0]),palette[i],i===0));
     const female=getOverall("Female"), male=getOverall("Male");
-    const industry=[...by(bands,"name")].map(([name,rs])=>({
-      name:label(name), values:sexes.map(s=>rs.find(r=>r.sex===s)?.pay),
-    }));
+    const industry = d.industryEarnings.filter(row=>row.year===year)
+      .sort((a,b)=>b.both-a.both)
+      .map(row=>({name:label(row.name),values:[row.female,row.male]}));
     const ageNames=unique(ages.map(r=>r.name)).sort((a,b)=>a.localeCompare(b,"zh-HK",{numeric:true}));
     const ageTicks=ageNames.map((_,i)=>i).filter(i=>i%2===0);
     const earningsStats = stats([money(female),t(`${year} 年女性月收入中位数`,`Women’s median monthly earnings, ${year}`)],
@@ -310,10 +310,11 @@
       [percent((male-female)/male*100),t("总体差额 ÷ 男性中位数","Overall gap as a share of the men’s median")])
       + controls(select("equityYear",t("联动年份","Linked year"),span(2008,2025).reverse()),hint("点趋势图上的年份，同步更新行业收入和劳动参与截面。","Select a year on the trend chart to update the industry and participation views."));
     return earningsStats + grid(
-        figure("income-industry",t("香港各行业男女月收入中位数","Hong Kong median monthly earnings by industry and sex"),yearLabel(year)+t(" · 港元／月"," · HKD per month"),
+        figure("income-industry",t("香港各行业男女月收入中位数","Hong Kong median monthly earnings by industry and sex"),yearLabel(year)+t(" · 港元／月 · 按男女合计中位数从高到低"," · HKD per month · Highest combined median first"),
           c.bars(industry,{labels:sexNames,colors:palette,max:Math.max(35000,...industry.flatMap(r=>r.values).filter(Number.isFinite)),format:number,label:t("同年各行业男女月收入中位数对照","Grouped bars comparing women’s and men’s median earnings by industry")}),
-          t("职业、年资、全职比例和工时都会影响群体中位数。目前可核实的内地公开数据缺少同口径的分行业、分性别月收入中位数，因此图中仅列香港数据。",
-            "Occupation, seniority, full-time share and hours affect the group medians. The chart shows Hong Kong figures. The Mainland public sources reviewed lack comparable monthly medians by industry and sex."),
+          t("运输和资讯合为一组，地产和专业及商业服务合为一组，社会及个人服务包含公共行政。职业、年资、全职比例和工时都会影响群体中位数。已核对的内地公开资料缺少同口径数据。",
+            "Transport and information share a group, as do real estate and professional and business services. Social and personal services include public administration. Occupation, seniority, full-time share and hours affect the group medians. Comparable Mainland figures were unavailable in the sources reviewed.")
+            + ` <a href="https://www.censtatd.gov.hk/en/web_table.html?id=210-06316">${t("香港政府统计处表 210-06316","Hong Kong C&SD Table 210-06316")}</a>`,
           {key:keys,full:true}))
       + appendix("equity-data",t("继续看总体月收入和劳动参与率","Explore overall earnings and labour force participation"),
       grid(

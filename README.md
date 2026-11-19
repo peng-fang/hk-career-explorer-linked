@@ -16,10 +16,12 @@
 
 网页数据来自《香港劳动力_整合数据集_三页探索版.xlsx》的原项目数据和「00_新增官方数据」。新增指标的来源和覆盖范围可在数据页及工作簿的「00_指标可比性」核对。香港招聘用 2026Q2 数据，预算中使用 2016–2025 年香港全职雇员工资与工时分布。原项目两地行业年龄对比含估计与分类合并。
 
-可用 Python 与 openpyxl 从含「00_深港行业工资」工作表的整合数据集重新生成 `data/guide-data.js`。
+香港分行业男女月收入采用香港政府统计处《综合住户统计调查》的 2008–2025 年度数据。仓库内的 `data/hk-industry-earnings.csv` 保留官方行业代码及女性、男性、男女合计三组中位数，单位为港元每月。图表使用男女合计中位数降序排列。[政府统计处表 210-06316](https://www.censtatd.gov.hk/en/web_table.html?id=210-06316) · [官方原始 CSV](https://www.censtatd.gov.hk/data/MDT_55_210-06316_MDNMEEEM_Raw_hkd_d.csv)
+
+可用 Python 与 openpyxl 从含「00_深港行业工资」工作表的整合数据集及上述 CSV 重新生成 `data/guide-data.js`。
 
 ```sh
-python scripts/export_data.py "/path/to/香港劳动力_整合数据集_深港工资对照版.xlsx"
+python scripts/export_data.py "/path/to/香港劳动力_整合数据集_深港工资扩展版.xlsx"
 ```
 
 页面布局与就地筛选参考组员的项目，章节、图表代码和筛选流程在本仓库独立实现。嘉宁为虚构人物，港景封面由图像生成工具制作。 [Hong Kong Job Market Explorer](https://github.com/ketianli082-stack/hong-kong-job-market-explorer)

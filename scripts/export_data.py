@@ -1,6 +1,7 @@
 """Export the data used by the guide from the integrated workbook."""
 
 import argparse
+import csv
 import json
 from pathlib import Path
 
@@ -8,6 +9,18 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EARNINGS_INDUSTRIES = {
+    "1": "Manufacturing",
+    "2": "Construction",
+    "3": "Import/export trade and wholesale",
+    "4.1": "Retail",
+    "4.2": "Accommodation and food services",
+    "5": "Transportation, storage, postal and courier services, information and communications",
+    "6.1": "Financing and insurance",
+    "6.2": "Real estate and professional and business services",
+    "7": "Public administration, social and personal services",
+    "8": "Other industries",
+}
 
 
 def records(workbook, prefix):
@@ -29,6 +42,20 @@ def project(rows, fields, *, numeric=()):
         }
         for row in rows
     ]
+
+
+def industry_earnings():
+    # Annual observations from C&SD Table 210-06316. Each median is published separately.
+    with (ROOT / "data" / "hk-industry-earnings.csv").open(encoding="utf-8", newline="") as file:
+        rows = [
+            {"year": int(row["year"]), "name": EARNINGS_INDUSTRIES[row["industry_code"]],
+             "female": int(row["female_hkd"]), "male": int(row["male_hkd"]),
+             "both": int(row["both_sexes_hkd"])}
+            for row in csv.DictReader(file)
+        ]
+    expected = {(year, name) for year in range(2008, 2026) for name in EARNINGS_INDUSTRIES.values()}
+    assert len(rows) == len(expected) and {(row["year"], row["name"]) for row in rows} == expected
+    return rows
 
 
 def use_workbook(workbook):
@@ -96,7 +123,6 @@ def use_workbook(workbook):
         "equity": project(
             (r for r in equity if r["sex"] in {"Female", "Male"} and (
                 r["group_type"] == "overall" and r["median_monthly_earnings_hkd"] is not None
-                or r["group_type"] == "industry" and r["median_monthly_earnings_hkd"] is not None
                 or r["group_type"] == "age_group" and r["age_group"] in clean_ages
                 and r["labour_force_participation_pct"] is not None
             )),
@@ -104,6 +130,7 @@ def use_workbook(workbook):
              "participation": "labour_force_participation_pct", "pay": "median_monthly_earnings_hkd"},
             numeric=("year", "participation", "pay"),
         ),
+        "industryEarnings": industry_earnings(),
         "demand": project(domain("市场"), demand_fields, numeric=("openings", "rate", "yoy", "jobs")),
         "occupations": project(
             domain("职业"),
