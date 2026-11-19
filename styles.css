@@ -131,11 +131,13 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .wage-exchange input { width: 126px; min-height: 35px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); }
 .wage-exchange .mode-note { align-self: center; }
 .wage-table { table-layout: fixed; }
-.wage-table .wage-amount-column { width: 15%; }
-.wage-table th[scope="colgroup"] { text-align: center; }
-.wage-table thead tr:last-child th { text-align: right; white-space: nowrap; }
+.wage-table .wage-amount-column { width: 17%; }
+.wage-table th[scope="colgroup"], .wage-table thead tr:last-child th, .wage-table tbody td { text-align: center; }
+.wage-table th[scope="colgroup"]:last-child,
+.wage-table thead tr:last-child th:nth-child(3),
+.wage-table tbody td:nth-child(4) { border-inline-start: 1px solid var(--line); }
+.wage-table .wage-value { display: inline-block; width: 78px; text-align: right; white-space: nowrap; }
 .wage-table tbody th, .wage-table tbody td { vertical-align: top; }
-.wage-table td { white-space: nowrap; }
 .bar-single .bar { height: 14px; }
 .bar-row .mirror { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; align-items: center; }
 .mirror .half { display: flex; min-width: 0; }

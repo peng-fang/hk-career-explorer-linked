@@ -169,7 +169,7 @@
     const data = d.payComparison ?? [];
     if (!data.length) return "";
     const rate = state.wageRate;
-    const unitColumns = `<th scope="col">${t("人民币／月","CNY/month")}</th><th scope="col">${t("港元／月","HKD/month")}</th>`;
+    const unitColumns = `<th scope="col"><span class="wage-value">${t("人民币／月","CNY/month")}</span></th><th scope="col"><span class="wage-value">${t("港元／月","HKD/month")}</span></th>`;
     const title = t("深圳与香港的行业月薪中位数","Median monthly wages in Shenzhen and Hong Kong");
     const fx = `<form class="control-bar wage-exchange" data-wage-exchange>
       <label class="field" for="wageRate">${t("汇率（1 人民币兑多少港元）","Exchange rate (HKD per CNY)")}
@@ -186,7 +186,7 @@
         <tbody>${data.map(row=>{
           const name = row.id==="all" ? t("全行业","All covered industries") : t(row.nameZh,row.nameEn);
           const szMonthly = row.sz/12;
-          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td>${number(Math.round(value))}</td>`).join("")}</tr>`;
+          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td><span class="wage-value">${number(Math.round(value))}</span></td>`).join("")}</tr>`;
         }).join("")}</tbody></table></div>`;
     return figure("pay-comparison",title,t("2024 年 · 男女合计 · 金额取整","2024 · Both sexes combined · Rounded to whole currency units"),
       fx + amountTable,
