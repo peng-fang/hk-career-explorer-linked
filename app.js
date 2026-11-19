@@ -112,16 +112,17 @@
       <img class="hero-image" src="assets/harbour.webp" alt="${t("维多利亚港傍晚的香港岛天际线，生成示意图","Generated illustration of the Hong Kong Island skyline at dusk, across Victoria Harbour")}"></section>`;
     return hero + heading(pages[0],0,"h2","market-compare")
       + `<div class="grid wide-pair market-ages">`
+      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
+          c.bars(paired(snapshot),{colors:palette,labels:regions,mirror:true,max:18,format:percent,label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
+          t("每行比较同一年龄段，左为内地、右为香港。沿用原表对齐分组，仅显示列出的年龄段，各列未重归一；两地就业统计定义有差异。",
+            "Each row pairs the same age group: Mainland China on the left, Hong Kong on the right. The chart uses the original aligned groups and denominators. Employment definitions differ between the two markets."),
+          {key:keys})
       + figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
           c.bars(aged35AndOver,{colors:palette,labels:regions,max:100,format:percent,label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
           t("35 岁及以上占比为 100% 减去 35 岁以下占比，分母为各地各行业的就业人数。两地统计时点相差一年，内地细分数据为项目估计。用于观察年龄结构，岗位需求见下一章。",
             "The share aged 35 and over equals 100% minus the under-35 share. The denominator is each industry’s workforce. Snapshots are one year apart and Mainland industry breakdowns are project estimates. See the next chapter for vacancy data."),
           {key:keys,control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`})
-      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
-          c.bars(paired(snapshot),{colors:palette,labels:regions,mirror:true,max:18,format:percent,label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
-          t("每行比较同一年龄段，左为内地、右为香港。沿用原表对齐分组，仅显示列出的年龄段，各列未重归一；两地就业统计定义有差异。",
-            "Each row pairs the same age group: Mainland China on the left, Hong Kong on the right. The chart uses the original aligned groups and denominators. Employment definitions differ between the two markets."),
-          {key:keys}) + `</div>`
+      + `</div>`
       + marketEvidence()
       + `<div class="decision"><strong>${t("嘉宁决定先查香港的岗位，同时保留内地投递。","Jia Ning decides to explore Hong Kong vacancies while keeping her Mainland search open.")}</strong>
         <div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>
