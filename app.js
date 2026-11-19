@@ -25,7 +25,7 @@
       ["带入你选的行业和职业组合，用行业工资、工时和每月开支试算。调整一个条件，看看哪些方向仍值得优先投递。","Test your selected industry and occupation pairs against industry pay, working hours and your monthly costs. Change one assumption and see which options still look worth applying for first."]),
   ];
   const state = {
-    marketPeriod:"latest", wageContextYear:2025, overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
+    marketPeriod:"latest", overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
@@ -111,18 +111,17 @@
       <a class="hero-button" href="#market-compare" data-scroll="market-compare">${t("开始探索","Start exploring")} <span aria-hidden="true">↓</span></a></div>
       <img class="hero-image" src="assets/harbour.webp" alt="${t("维多利亚港傍晚的香港岛天际线，生成示意图","Generated illustration of the Hong Kong Island skyline at dusk, across Victoria Harbour")}"></section>`;
     return hero + heading(pages[0],0,"h2","market-compare")
-      + grid(
-        figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
+      + `<div class="grid wide-pair market-ages">`
+      + figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
           c.bars(aged35AndOver,{colors:palette,labels:regions,max:100,format:percent,label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
           t("35 岁及以上占比为 100% 减去 35 岁以下占比，分母为各地各行业的就业人数。两地统计时点相差一年，内地细分数据为项目估计。用于观察年龄结构，岗位需求见下一章。",
             "The share aged 35 and over equals 100% minus the under-35 share. The denominator is each industry’s workforce. Snapshots are one year apart and Mainland industry breakdowns are project estimates. See the next chapter for vacancy data."),
-          {key:keys,full:true,control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`}))
-      + appendix("market-ages",t("查阅两地就业人口年龄结构（2010 年）","Explore workforce age profiles (2010)"),
-        figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
+          {key:keys,control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`})
+      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
           c.bars(paired(snapshot),{colors:palette,labels:regions,mirror:true,max:18,format:percent,label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
           t("每行比较同一年龄段，左为内地、右为香港。沿用原表对齐分组，仅显示列出的年龄段，各列未重归一；两地就业统计定义有差异。",
             "Each row pairs the same age group: Mainland China on the left, Hong Kong on the right. The chart uses the original aligned groups and denominators. Employment definitions differ between the two markets."),
-          {key:keys}))
+          {key:keys}) + `</div>`
       + marketEvidence()
       + `<div class="decision"><strong>${t("嘉宁决定先查香港的岗位，同时保留内地投递。","Jia Ning decides to explore Hong Kong vacancies while keeping her Mainland search open.")}</strong>
         <div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>
@@ -150,18 +149,6 @@
       t("劳动参与率是同一性别人口中正在工作或处于失业状态的人所占的比例。两地采用相同的年龄下限和估计方法。",
         "The rate is the share of each sex that is employed or unemployed. Both markets use the same age threshold and estimation method."),
       {key:legend(sexes.map((name,i)=>[name,[rose,purple][i]])),full:true});
-    const wageKeys = ["wage_nonprivate","wage_private"];
-    const wageRows = data.filter(row=>wageKeys.includes(row.indicator));
-    const years = unique(wageRows.map(row=>+row.period)).sort((a,b)=>b-a);
-    const wageData = wageRows.filter(row=>+row.period===state.wageContextYear);
-    const sectors = [t("非私营单位","Non-private units"), t("私营单位","Private units")];
-    const mainlandPay = figure("income-mainland",t("内地城镇单位分行业年平均工资","Average annual wages in urban Mainland units by industry"),
-      yearLabel(state.wageContextYear)+t(" · 人民币元／年 · 税前"," · CNY per year · Before tax"),
-      c.bars([...by(wageData,"nameZh")].map(([,rows])=>({name:group(rows[0]),values:wageKeys.map(key=>rows.find(row=>row.indicator===key)?.value)})),
-        {labels:sectors,colors:[purple,rose],format:number,label:t("内地城镇单位工资按私营和非私营分类","Average wages for private and non-private urban units in Mainland China")}),
-      t("数据来自城镇地域内就业人数至少 5 人的法人单位。破折号表示该类别未发布数值。两类单位分别统计。",
-        "The survey covers legal entities in urban areas with at least five workers. A dash indicates an unpublished figure. Private and non-private units are reported separately."),
-      {full:true,key:legend(sectors.map((name,i)=>[name,[purple,rose][i]])),control:select("wageContextYear",t("内地工资年份","Mainland wage year"),years)});
     return `<section aria-labelledby="risk-heading"><header class="subhead"><h2 id="risk-heading">${t("年轻人找工作有多难？","How much pressure do younger job seekers face?")}</h2>
       ${hint("每张图各自呈现当地总体与青年失业率。两地年龄范围、在校生处理和统计时段不同，图表各用当地刻度。","Each chart shows local overall and youth unemployment. Age bands, treatment of students and reference periods differ, so each chart uses its own scale.")}</header>`
       + grid(unemployment("CN",t("全国城镇调查失业率","Urban China surveyed unemployment"),t("2025 年 12 月","December 2025"),
@@ -171,10 +158,7 @@
       + appendix("risk-hk",t("查阅香港失业率历史、年龄及教育组","Explore Hong Kong unemployment history, age and education"),risk()) + `</section>
       <section aria-labelledby="pay-context-heading"><header class="subhead"><h2 id="pay-context-heading">${t("谁在参与劳动市场？行业收入怎么看？","Who participates in the labour market, and what do industries pay?")}</h2></header>`
       + grid(participation)
-      + appendix("market-wages",t("查阅两地各自的行业收入数据","Explore each market’s industry earnings"),
-        hint("内地是城镇单位年平均工资，香港是就业人士月收入中位数。各自按当地行业分类、调查范围和币种展示。",
-          "Mainland data are average annual wages from urban units. Hong Kong data are median monthly earnings from household surveys. Each uses its own industry categories, coverage and currency.")
-        + grid(mainlandPay) + equity()) + `</section>`;
+      + appendix("market-wages",t("查阅香港各行业男女月收入","Explore Hong Kong industry earnings by sex"),equity()) + `</section>`;
   }
 
   function structure() {
@@ -293,10 +277,10 @@
       [percent((male-female)/male*100),t("总体差额 ÷ 男性中位数","Overall gap as a share of the men’s median")])
       + controls(select("equityYear",t("联动年份","Linked year"),span(2008,2025).reverse()),hint("点趋势图上的年份，同步更新行业收入和劳动参与截面。","Select a year on the trend chart to update the industry and participation views."));
     return earningsStats + grid(
-        figure("income-industry",t("行业月收入中位数","Median monthly earnings by industry"),yearLabel(year)+t(" · 港元／月"," · HKD per month"),
+        figure("income-industry",t("香港各行业男女月收入中位数","Hong Kong median monthly earnings by industry and sex"),yearLabel(year)+t(" · 港元／月"," · HKD per month"),
           c.bars(industry,{labels:sexNames,colors:palette,max:Math.max(35000,...industry.flatMap(r=>r.values).filter(Number.isFinite)),format:number,label:t("同年各行业男女月收入中位数对照","Grouped bars comparing women’s and men’s median earnings by industry")}),
-          t("各行业的职业、年资、全职比例与工时都会影响群体中位数。图上的差距描述两个就业群体的总体收入。",
-            "Occupation, seniority, full-time share and hours affect each group’s median. The bars describe earnings across each group of employed people."),
+          t("职业、年资、全职比例和工时都会影响群体中位数。目前可核实的内地公开数据缺少同口径的分行业、分性别月收入中位数，因此图中仅列香港数据。",
+            "Occupation, seniority, full-time share and hours affect the group medians. The chart shows Hong Kong figures. The Mainland public sources reviewed lack comparable monthly medians by industry and sex."),
           {key:keys,full:true}))
       + appendix("equity-data",t("继续看总体月收入和劳动参与率","Explore overall earnings and labour force participation"),
       grid(
@@ -348,12 +332,12 @@
           placeholder="${t("例如摄影、零售数据分析","For example, photography or retail analytics")}"></label>
       <p class="mode-note">${t("自定义词会带到最终页，供搜索招聘广告时参考。","Custom terms carry to the final page for searching job ads.")}</p>
       ${rules.length ? `<div class="pathway-rules"><h3>${t("按工作任务找职业组","Find occupation groups by the work they do")}</h3>
-        ${rules.map(rule=>`<article class="pathway-rule" data-rule="${esc(rule.id)}"><strong>${esc(rule.task)}</strong>
+        <div class="pathway-rule-grid">${rules.map(rule=>`<article class="pathway-rule" data-rule="${esc(rule.id)}"><strong>${esc(rule.task)}</strong>
           <p>${esc(list(rule.match))}</p>
           <p>${t("岗位搜索词","Job-ad keywords")} · ${esc(rule.words)}</p>
           <div class="chip-row" role="group" aria-label="${esc(rule.task)}">
             ${rule.groups.map(group=>chip("taskOccupation",`${rule.id}|${group}`,label(group),state.taskOccupations[rule.id]===group)).join("")}</div>
-        </article>`).join("")}
+        </article>`).join("")}</div>
         <p class="mode-note">${t("每项任务可独立选一个职业组，热力表会合并同名职业组。实际职业分类取决于岗位职责。",
           "Choose one occupation per task. The heatmap combines duplicate groups. Actual classification depends on job duties.")}</p>
         <a class="secondary-link" href="#hiring" data-scroll="hiring">${t("查看招聘热力表","Go to the vacancy heatmap")} ↓</a></div>` : ""}
@@ -592,23 +576,23 @@
             "The pale band runs from the 25th to the 75th percentile, covering the middle half. The dot is the median. Select it to use that value in the budget.")),
         figure("hours-range",t("每周工时区间","Weekly hours range"),t(`${state.payYear} 年 5–6 月 · 全职雇员 · 小时／周`,`May–June ${state.payYear} · Full-time employees · Hours/week`),
           intervals(referenceRows,"hours",selectedIndustries),t("虚线是你设定的每周工时上限。即使中位数达标，仍可用整个区间判断是否要在面试中先问加班。",
-            "The dashed line marks your weekly hours limit. Read the full range to decide whether to ask about overtime, even if the median fits.")),
-        figure("budget",t("个人生活预算","Monthly budget"),t("可编辑示例 · 港元／月","Editable scenario · HKD per month"),
+            "The dashed line marks your weekly hours limit. Read the full range to decide whether to ask about overtime, even if the median fits.")))
+      + `<div class="grid wide-pair budget-history">`
+      + figure("budget",t("个人生活预算","Monthly budget"),t("可编辑示例 · 港元／月","Editable scenario · HKD per month"),
           `<form class="control-bar" data-budget-form>${budgetField("offer",t("Offer 月薪","Monthly offer"),1)}${budgetField("rent",t("每月房租","Monthly rent"),1)}
           ${budgetField("living",t("生活交通","Living and transport"),1)}${budgetField("deduct",t("预留扣款","Set-aside for deductions"),1)}
           <button class="chip apply-budget" type="submit" id="apply-budget">${t("更新预算","Apply budget")}</button></form>`
           +viz("budget-waterfall",w=>c.waterfall(w,state)),
           t("从 Offer 月薪扣去三项开支。预留扣款由你填写；可把预计税款和强积金统一填入，实际金额以适用规定和合约为准。",
-            "The budget subtracts three expenses from the assumed offer. Enter your own allowance for items such as tax and MPF. Actual deductions depend on the applicable rules and contract."),
-          {full:true}))
-      + `</section><section aria-labelledby="shortlist-heading"><header class="subhead"><h2 id="shortlist-heading">${t("哪些方向值得优先查证？","Which options should I investigate first?")}</h2></header>`
-      + grid(
-        figure("history",t("行业用工走势","Employment trends by industry"),t("季度 · 以 2016Q1 为 100","Quarterly index · 2016 Q1 = 100"),
+            "The budget subtracts three expenses from the assumed offer. Enter your own allowance for items such as tax and MPF. Actual deductions depend on the applicable rules and contract."))
+      + figure("history",t("行业用工走势","Employment trends by industry"),t("季度 · 以 2016Q1 为 100","Quarterly index · 2016 Q1 = 100"),
           series("history-line",history,{x:[state.startYear,end],xTicks:histYears,y:[histMin,histMax],refY:100,
             xFormat:String,label:t("所选行业季度用工指数折线图","Quarterly employment index for selected industries")}),
           t("指数是当季就业人数除以该行业 2016Q1 人数后乘 100。选择起始年只缩短展示范围，基期保持原值。线条描述行业规模，无法估计个人失业风险。",
             "The index divides employment in each quarter by that industry’s 2016 Q1 count and multiplies by 100. Changing the start year changes only the viewing window. The lines describe industry employment levels."),
-          {control:select("startYear",t("历史起始年","History start year"),span(2016,2025)),key:legend(history.map(s=>[s.name,s.color])),full:true}),
+          {control:select("startYear",t("历史起始年","History start year"),span(2016,2025)),key:legend(history.map(s=>[s.name,s.color]))})
+      + `</div></section><section aria-labelledby="shortlist-heading"><header class="subhead"><h2 id="shortlist-heading">${t("哪些方向值得优先查证？","Which options should I investigate first?")}</h2></header>`
+      + grid(
         figure("candidates",t("候选方向对照","Shortlist comparison"),t("三项门槛都达到的方向排在前面","Options that meet all three criteria appear first"),
           shortlistTable(ranked),
           t("招聘按行业和职业组统计。薪酬与工时按细分行业的全职雇员统计。表中按行业月薪 P50 估算结余，预算图使用输入的 Offer。",
@@ -636,7 +620,11 @@
         ${hk("210-06401","香港分年龄失业率","Hong Kong unemployment by age")}${t("。内地为 2025 年 12 月，香港为第四季度、未经季调。",". Mainland figures refer to December 2025. Hong Kong figures refer to Q4, unadjusted.")}</li>
       <li><a href="https://genderdata.worldbank.org/en/economies/china">${t("世界银行 · 内地劳动参与率","World Bank · Mainland participation")}</a> ·
         <a href="https://genderdata.worldbank.org/en/economies/hong-kong-sar-china">${t("世界银行 · 香港劳动参与率","World Bank · Hong Kong participation")}</a>${t("。2025 年男女数据均为 ILO 15 岁及以上模型估计。",". The 2025 figures are ILO modelled estimates for ages 15 and above, by sex.")}</li>
-      <li><a href="https://www.stats.gov.cn/sj/zxfbhjd/202605/t20260515_1963707.html">${t("国家统计局 · 城镇单位就业人员年平均工资（表 2、5）","National Bureau of Statistics · Average annual wages of workers in urban units (Tables 2 and 5)")}</a>${t("。原值、定义、出处及可比性收录在整合工作簿的「00_新增官方数据」「00_指标可比性」。",". Original figures, definitions, sources and comparability notes are in the consolidated workbook.")}</li></ul>
+      <li>${t("行业收入的口径核对见","For the industry earnings coverage check, see")}
+        <a href="https://www.stats.gov.cn/sj/zxfbhjd/202605/t20260515_1963707.html">${t("国家统计局城镇单位年平均工资","NBS average annual wages in urban units")}</a> ·
+        <a href="https://ilostat.ilo.org/topics/wages/">ILOSTAT</a> ·
+        <a href="https://sle.ajcass.com/Admin/UploadFile/Issue/201911110002/2024/4/20240423101905WU_FILE_0.pdf">${t("中国城市劳动力调查（表 12）","China Urban Labour Survey (Table 12)")}</a>${t("。国家统计局表 2、5 按单位类型分组，ILOSTAT 的内地行业月平均收入只有男女合计，八城市调查发布的是税后平均月工资。香港收入图采用中位数。",
+          ". NBS tables 2 and 5 group workers by type of employer. ILOSTAT has combined-sex Mainland industry means. The eight-city survey publishes average take-home monthly wages. Hong Kong’s chart uses medians.")}</li></ul>
       <h3>${t("香港就业、失业与收入","Hong Kong employment, unemployment and earnings")}</h3>
       <ul><li>${t("就业规模和构成来自整合 Excel 的 <code>01_01</code>、<code>01_02</code> 工作表。失业率、年龄和教育数据来自 <code>04_05</code>。",
         "Employment levels and breakdowns come from sheets <code>01_01</code> and <code>01_02</code>. Unemployment, age and education data come from <code>04_05</code>.")}</li>

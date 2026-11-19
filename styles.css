@@ -78,6 +78,9 @@ main, .footer { max-width: 1520px; margin: auto; padding: 0 34px; }
 .stat strong { display: block; color: #553468; font: 740 clamp(17px, 2vw, 24px)/1.2 system-ui, sans-serif; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
 .stat span { color: var(--muted); font-size: 12px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
+.grid.wide-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr)); }
+.budget-history { margin-top: 15px; }
+.market-ages #ages .bar-row { grid-template-columns: 48px minmax(0, 1fr); }
 .span-full { grid-column: 1 / -1; }
 .card { border-radius: var(--radius); border: 1px solid var(--line); background: var(--cream); min-width: 0; padding: 18px; display: flex; flex-direction: column; }
 .card-head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 5px 12px; margin-bottom: 9px; }
@@ -204,7 +207,8 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 #profile-limit { margin: 6px 0; }
 #profile-limit:empty { margin: 6px 0 0; }
 .pathway-rules { margin-top: 12px; padding: 11px; background: #f3ebf2; border-radius: 10px; }
-.pathway-rule { padding: 8px 0; border-bottom: 1px solid #e4d7e5; }
+.pathway-rule-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr)); gap: 8px; margin: 8px 0; }
+.pathway-rule { min-width: 0; padding: 8px 10px; background: var(--cream); border: 1px solid #e4d7e5; border-radius: 8px; }
 .pathway-rule p, .pair-list p { font-size: 13px; color: var(--muted); margin: 2px 0; }
 .pathway-rule .chip-row { margin-top: 5px; }
 .evidence { margin-top: 12px; }
