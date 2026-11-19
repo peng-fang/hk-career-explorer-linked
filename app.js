@@ -179,7 +179,8 @@
       <p class="mode-note"><a class="secondary-link" href="${wageRateSource}">${t(`2024 年平均汇率（1 人民币 = ${defaultWageRate} 港元）`,`2024 average exchange rate (CNY 1 = HKD ${defaultWageRate})`)}</a></p>
       </form>`;
     const amountTable = `<div class="table-scroll" tabindex="0" aria-label="${title}">
-      <table class="compact-table wage-table"><colgroup></colgroup><colgroup span="2"></colgroup><colgroup span="2"></colgroup>
+      <table class="compact-table wage-table">
+        <colgroup><col></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup>
         <thead><tr><th scope="col" rowspan="2">${t("行业","Industry")}</th><th scope="colgroup" colspan="2">${t("深圳","Shenzhen")}</th><th scope="colgroup" colspan="2">${t("香港","Hong Kong")}</th></tr>
         <tr>${unitColumns}${unitColumns}</tr></thead>
         <tbody>${data.map(row=>{

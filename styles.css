@@ -130,7 +130,11 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .bar-row .bar b { left: calc(100% + 5px); top: 50%; transform: translateY(-50%); position: absolute; font: 650 10px/1 system-ui, sans-serif; white-space: nowrap; }
 .wage-exchange input { width: 126px; min-height: 35px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); }
 .wage-exchange .mode-note { align-self: center; }
+.wage-table { table-layout: fixed; }
+.wage-table .wage-amount-column { width: 15%; }
 .wage-table th[scope="colgroup"] { text-align: center; }
+.wage-table thead tr:last-child th { text-align: right; white-space: nowrap; }
+.wage-table tbody th, .wage-table tbody td { vertical-align: top; }
 .wage-table td { white-space: nowrap; }
 .bar-single .bar { height: 14px; }
 .bar-row .mirror { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; align-items: center; }
