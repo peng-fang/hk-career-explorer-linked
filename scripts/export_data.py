@@ -21,6 +21,16 @@ EARNINGS_INDUSTRIES = {
     "7": "Public administration, social and personal services",
     "8": "Other industries",
 }
+OVERVIEW_INDUSTRIES = {
+    "Manufacturing": "Manufacturing",
+    "Construction": "Construction",
+    "Import/export trade and wholesale": "Import/export & wholesale",
+    "Retail, accommodation and food services": "Retail & accommodation",
+    "Transportation, storage, postal and courier services, information and communications": "Transportation & information",
+    "Financing, insurance, real estate, professional and business services": "Finance & professional",
+    "Public administration, social and personal services": "Public & social services",
+    "Other industries": "Other industries",
+}
 
 
 def records(workbook, prefix):
@@ -112,6 +122,11 @@ def use_workbook(workbook):
              and all(r[key] == "Total" for key in ("industry", "sex", "age_group"))),
             {"year": "year", "value": "value"}, numeric=("year", "value"),
         ),
+        "industryEmployment": [
+            {"year": int(r["year"]), "name": OVERVIEW_INDUSTRIES[r["industry"]], "value": as_number(r["value"])}
+            for r in all_jobs if r["source_table"] == "employment_by_industry_annual"
+            and all(r[key] == "Total" for key in ("sex", "age_group")) and r["industry"] != "Total"
+        ],
         "structure": project(
             (r for r in overview if r["chart"] in {"status", "occupation", "industry_share"}),
             {"kind": "chart", "year": "year", "name": "category", "share": "employment_share_pct",
@@ -162,6 +177,9 @@ def use_workbook(workbook):
     assert len(result["demand"]) == 10 and len(result["occupations"]) == 90
     assert len(result["pay"]) == 180 and len(result["history"]) == 420
     assert len(result["industryEmploymentBySex"]) == 288
+    industry_keys = {(r["year"], r["name"]) for r in result["industryEmployment"]}
+    assert len(industry_keys) == len(result["industryEmployment"]) == 144
+    assert industry_keys == {(r["year"], r["name"]) for r in result["structure"] if r["kind"] == "industry_share"}
     assert all(result[key] for key in result)
     assert len({(r["id"], r["name"], r["year"]) for r in result["pay"]}) == len(result["pay"])
     if pay_comparison:

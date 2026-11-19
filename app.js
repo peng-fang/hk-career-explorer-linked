@@ -19,8 +19,8 @@
   const pages = [
     item("markets",["两地对照","Two markets"],["香港值得深入看看吗？","Should I explore Hong Kong further?"],["毕业后，要不要把香港列为求职重点？","Should I focus my job search on Hong Kong?"],
       ["刚在香港读完硕士的嘉宁，正在考虑毕业后在哪里工作。她先看内地与香港的就业年龄结构和青年失业率，再参考深圳与香港的行业月薪。","Jia Ning has just finished her master’s degree in Hong Kong and is deciding where to look for work. She starts with workforce age and youth unemployment in both markets, then looks at industry wages in Shenzhen and Hong Kong."]),
-    item("structure",["发现方向","Discover options"],["从我的背景找方向","Explore options that fit my background"],["香港哪些行业在招我想做的工作？","Which Hong Kong industries hire for the work I want to do?"],
-      ["先用专业、兴趣和技能找到可探索的职业组，再根据真实空缺选出想进一步查证的行业和职业组合。","Start with your studies, interests and skills. Use vacancy data to choose industry and occupation pairs worth investigating."]),
+    item("structure",["发现方向","Discover options"],["从行业趋势到求职方向","From industry trends to job options"],["在香港，我可以从哪些行业开始找工作？","Where could I start my job search in Hong Kong?"],
+      ["先看香港各行业有多少人在工作、近年有何变化。再结合自己的专业、兴趣和技能选职业组，到招聘热力表查看哪些行业有相关空缺。","Start with the size and trends of Hong Kong’s industries. Then use your studies, interests and skills to choose occupation groups and look for vacancies in the heatmap."]),
     item("fit",["试算个人条件","Test my criteria"],["工资、工时和生活费怎么算？","How do pay, hours and costs add up?"],["这些方向，能支撑我想要的香港生活吗？","Could these options support the life I want in Hong Kong?"],
       ["带入你选的行业和职业组合，用行业工资、工时和每月开支试算。调整一个条件，看看哪些方向仍值得优先投递。","Test your selected industry and occupation pairs against industry pay, working hours and your monthly costs. Change one assumption and see which options still look worth applying for first."]),
   ];
@@ -83,7 +83,6 @@
     if (pair.comparison) return t("手动加入作对照","Manually added for comparison");
     return rule ? `${rule.task} · ${list(rule.match)}` : t("本人选定的探索方向","Manually selected for exploration");
   };
-  const appendix = (id, title, content) => `<details class="appendix" id="${id}"><summary>${title}</summary>${content}</details>`;
 
   function markets() {
     const snapshot = d.markets.filter(r=>r.kind==="A_2010年龄对照");
@@ -179,44 +178,68 @@
     const total=d.total.find(r=>r.year===year)?.value;
     const industries=d.structure.filter(r=>r.kind==="industry_share");
     const years=unique(industries.map(r=>r.year)).sort((a,b)=>a-b);
+    const counts = by(d.industryEmployment,"name");
+    const totalName = t("全港总量","Hong Kong total"), totalColor="#30213f";
+    const thousand = value=>`${number(value)}${t(" 千人"," thousand people")}`;
+    const yearPoints = (name,rows)=>rows.slice().sort((a,b)=>a.year-b.year)
+      .map(r=>[r.year,r.value,`${yearLabel(r.year)} · ${name} · ${thousand(r.value)}`]);
     const sets=[...by(industries,"name")].map(([name,rs],i)=>({
       key:i,name:label(name), color:colors[i], values:years.map(y=>rs.find(r=>r.year===y)?.share),
+      points:yearPoints(label(name),counts.get(name)), pointValue:y=>`${y}|${i}`,
     }));
+    const allIndustries = t("全部行业","All industries");
     const focused = sets[state.overviewIndustry];
     const biggest = sets.slice().sort((a,b)=>b.values[years.indexOf(year)]-a.values[years.indexOf(year)])[0];
+    const highlighted = focused ?? biggest;
+    const totals = {...lineSet(totalName,yearPoints(totalName,d.total),totalColor),strokeWidth:3.2};
+    const industryKeys = sets.map(s=>[String(s.key),s.name,s.color]);
+    const activeIndustry = focused ? String(focused.key) : "all";
+    const yearTicks = {xTicks:[2008,2012,2016,2020,2025],xFormat:String,refX:year,
+      action:"overviewYear",canSelect:x=>x>=2016};
     const status=d.structure.filter(r=>r.kind==="status" && r.year===year);
     const work=d.structure.filter(r=>r.kind==="occupation" && r.year===year);
     const overview = stats([number(total)+t(" 千人","k"),t(`${year} 年香港就业总量`,`Total employment in ${year}`)],
-      [percent(biggest.values[years.indexOf(year)]),t(label(biggest.name)+"的就业份额",label(biggest.name)+" share")],
-      [percent(status.find(r=>r.name==="Employees").status/status.reduce((a,r)=>a+r.status,0)*100),t(`${year} 年雇员占比`,`Employee share in ${year}`)])
-      + controls(select("overviewYear",t("联动年份","Linked year"),span(2016,2025).reverse()),hint("点两张趋势图的 2016 年后位置，或用年份菜单同步更新截面。","Select any year from 2016 onward on either trend chart, or use the year menu to update both breakdowns."))
+      [percent(highlighted.values[years.indexOf(year)]),t(`${highlighted.name}占全港就业的比例`,`${highlighted.name} share of Hong Kong employment`)],
+      [percent(status.find(r=>r.name==="Employees").status/status.reduce((a,r)=>a+r.status,0)*100),t(`${year} 年全港雇员占比`,`Hong Kong employee share in ${year}`)])
+      + controls(select("overviewYear",t("联动年份","Linked year"),span(2016,2025).reverse()),
+        select("overviewIndustry",t("查看行业","Industry view"),["all",...sets.map(s=>String(s.key))],
+          id=>id==="all"?allIndustries:sets[Number(id)].name,activeIndustry),
+        hint("选择行业会同步更新人数图和占比图。点任一趋势图上的 2016–2025 年数据，可切换两张全港构成图的年份。",
+          "Select an industry to update the headcount and share charts. Select a year from 2016 to 2025 on either trend chart to update both Hong Kong breakdowns."))
       + grid(
-        figure("employment",t("香港就业总量","Total employment"),t("2008–2025 年 · 千人","2008–2025 · Thousands of people"),
-          series("employment-line",[lineSet(t("就业总量","Total employment"),d.total.map(r=>[r.year,r.value,`${yearLabel(r.year)} · ${number(r.value)}${t(" 千人"," thousand people")}`]))],
-            {xTicks:[2008,2012,2016,2020,2025],y:[0,4200],yTicks:[0,1000,2000,3000,4000],refX:year,action:"overviewYear",canSelect:x=>x>=2016,label:t("香港就业总量年度折线图","Annual total employment in Hong Kong")}),
-          t("线高表示全港就业人数，竖虚线是选中的年份。早期年份供趋势比较，雇佣身份和职业构成从 2016 年起联动。",
-            "The line shows total employment. The dashed line marks the selected year. Employment status and occupation breakdowns are available from 2016.")),
+        figure("employment",t("香港就业人数","Hong Kong employment headcount"),(focused ? focused.name+" · " : "")+t("2008–2025 年 · 千人","2008–2025 · Thousands of people"),
+          series("employment-line",focused?[focused]:[totals,...sets],
+            {...yearTicks,...(focused?{}:{y:[0,4200],yTicks:[0,1000,2000,3000,4000]}),
+              label:t("香港就业人数年度折线图","Annual employment headcount in Hong Kong")}),
+          t("深色线是全港总量，彩线是各行业的就业人数。点某条行业折线的年份圆点，可同时选择行业和年份。单行业视图会调整纵轴，点「全港总量」可对照所有曲线。",
+            "The dark line shows the Hong Kong total. Coloured lines show industry headcounts. Select a point to choose its industry and year. The scale adjusts in single-industry view. Choose “Hong Kong total” to restore all lines."),
+          {key:filterLegend("overviewIndustry",[["all",totalName,totalColor],...industryKeys],activeIndustry,"employment")}),
         figure("industry",t("行业就业占比","Employment share by industry"),t("2008–2025 年 · 占全港就业的百分比","2008–2025 · Percentage of total employment"),
-          focused ? series("industry-area",[{...focused,points:years.map((y,i)=>[y,focused.values[i],`${focused.name} · ${yearLabel(y)} · ${percent(focused.values[i])}`])}],
-            {xTicks:[2008,2012,2016,2020,2025],yFormat:percent,refX:year,action:"overviewYear",canSelect:x=>x>=2016,label:focused.name})
+          focused ? series("industry-area",[lineSet(focused.name,
+            years.map((y,i)=>[y,focused.values[i],`${focused.name} · ${yearLabel(y)} · ${percent(focused.values[i])}`]),focused.color)],
+            {...yearTicks,yFormat:percent,label:focused.name})
             : viz("industry-area",w=>c.stack(w,sets,years,year)),
-          t("点色带或图例展开单一行业，单行业视图的年份点仍与就业总量、雇佣身份和职业构成联动。份额的分母始终是全港就业。",
-            "Select a band or legend item to isolate an industry. Year points still link total employment, status and occupation mix. Shares always use total Hong Kong employment as the denominator."),
-          {key:filterLegend("overviewIndustry",sets.map(s=>[String(s.key),s.name,s.color]),String(state.overviewIndustry),"industry"),
-            control:focused ? chip("overviewIndustry","all",t("全部行业","All industries")) : ""}),
-        figure("employment-status",t("雇佣身份构成","Employment status"),yearLabel(year)+t(" · 就业人数"," · Employed population"),
+          t("色带厚度表示该行业占全港就业的份额。点击色带或图例可查看单一行业，同时更新左侧人数图。",
+            "Band thickness shows each industry’s share of total Hong Kong employment. Select a band or legend item to see one industry in both trend charts."),
+          {key:filterLegend("overviewIndustry",industryKeys,activeIndustry,"industry"),
+            control:focused ? chip("overviewIndustry","all",allIndustries) : ""}),
+        figure("employment-status",t("雇佣身份构成","Employment status"),yearLabel(year)+t(" · 全港就业人口"," · Hong Kong employed population"),
           c.donut(status.map(r=>({name:label(r.name),value:r.status}))),
           t("比较受雇、自雇等身份的结构。刚毕业时可以从雇员岗位入手，再按具体工作形式扩展搜索。",
             "Compare employees, the self-employed and other groups. Jia Ning starts with employee roles and can broaden her search to other arrangements.")),
-        figure("occupation",t("职业构成","Occupational mix"),yearLabel(year)+t(" · 方块面积为就业人数"," · Area represents employment"),
+        figure("occupation",t("职业构成","Occupational mix"),yearLabel(year)+t(" · 全港就业人口"," · Hong Kong employed population"),
           c.treemap(work.map(r=>({name:label(r.name),value:r.work,
             occupation:pathway.occupationGroups.includes(r.name)?r.name:null}))),
-          t("职业描述做什么，行业描述雇主经营什么。聚焦色块可查看就业人数和占比，点击共有职业组可查看招聘空缺。",
-            "Occupations describe what people do. Focus a tile for employment count and share, or select a matching occupation group to explore current vacancies.")));
+          t("方块面积表示该职业组的全港就业人数。点击热力表中也有的职业组，可直接查看当前空缺。",
+            "Tile area shows how many people in Hong Kong work in each occupation group. Select a group that is also in the heatmap to explore current vacancies.")));
     const rules = pathway.suggestions(state.profile);
     const taskGroups = new Set(rules.map(rule=>state.taskOccupations[rule.id]).filter(Boolean));
-    return heading(pages[1],1) + profilePanel(rules)
-      + appendix("structure-data",t("查阅香港行业与职业结构","Explore Hong Kong’s industries and occupations"),overview)
+    return heading(pages[1],1)
+      + `<section id="structure-data" aria-labelledby="structure-overview-heading"><header class="subhead">
+        <h2 id="structure-overview-heading">${t("香港就业规模与构成","Hong Kong employment and its composition")}</h2>
+        <a class="secondary-link" href="#profile-heading" data-scroll="profile-heading">${t("跳到我的求职背景","Jump to my search profile")} ↓</a>
+        </header>${overview}</section>`
+      + profilePanel(rules)
       + vacancyPanel(taskGroups) + pairReview();
   }
 
@@ -241,7 +264,7 @@
       <div class="chip-row">${Object.keys(options).map(id => chip("profileTag",`${key}|${id}`,pathway.nameOf(options,id),profile[key].includes(id))).join("")}</div></fieldset>`;
     return `<section class="card profile-card" aria-labelledby="profile-heading">
       <div class="card-head"><div><h2 id="profile-heading">${t("我的求职背景","My search profile")}</h2>
-        <p class="card-unit">${t("专业、工作兴趣与可展示的技能都可跳过。","You can skip any of the fields.")}</p></div>
+        <p class="card-unit">${t("按自己的背景选标签，查看相关工作任务和职业组。每一项都可以跳过。","Choose tags that describe you to see related work tasks and occupation groups. You can skip any field.")}</p></div>
         <div class="chip-row">${chip("profileExample","jia",t("载入嘉宁的背景","Load Jia Ning’s profile"))}
           ${chip("clearProfile","all",t("清空个人标签，浏览全部职业","Clear tags and browse all occupations"))}</div></div>
       <div class="profile-majors">${major("major",t("主专业","Main field of study"))}${major("minor",t("辅方向","Additional field"))}</div>
@@ -633,7 +656,7 @@
 
   function render(focusKey) {
     pathway.save(state);
-    for(const details of main.querySelectorAll("details.appendix, details[data-persist-open]")) {
+    for(const details of main.querySelectorAll("details[data-persist-open]")) {
       if(details.open) openPanels.add(details.id);
       else openPanels.delete(details.id);
     }
@@ -648,7 +671,7 @@
     $("chapters").innerHTML=pages.map((p,i)=>`<a href="#${p.id}"${p.id===chapter?' aria-current="page"':""}>
       <span class="nav-number">${mk(i)}</span><span><strong>${p.title}</strong><small>${p.subtitle}</small></span></a>`).join("");
     main.innerHTML=renderPage[chapter]();
-    for(const details of main.querySelectorAll("details.appendix, details[data-persist-open]")) {
+    for(const details of main.querySelectorAll("details[data-persist-open]")) {
       details.open = openPanels.has(details.id);
     }
     main.querySelectorAll("[data-chart]").forEach(el=>{
@@ -672,7 +695,7 @@
     if(id==="content") { main.focus(); return; }
     const anchors = new Map([
       ["shortlist",["structure","pairs-heading"]], ["review",["structure","pairs-heading"]],
-      ["hiring",["structure","hiring"]],
+      ["hiring",["structure","hiring"]], ["profile-heading",["structure","profile-heading"]],
       ["market-compare",["markets","market-compare"]], ["risk",["markets","risk-heading"]],
       ["equity",["markets","pay-comparison"]],
       ["pay-comparison",["markets","pay-comparison"]],
@@ -711,8 +734,10 @@
     if(key==="marketRegion") state.marketRegion=state.marketRegion===value?"":value;
     if(key==="resetWageRate") state.wageRate=defaultWageRate;
     if(key==="overviewYear") {
-      if (+value<2016) return;
-      state.overviewYear=+value;
+      const [year,industry] = value.split("|").map(Number);
+      if (year<2016) return;
+      state.overviewYear=year;
+      if (industry!==undefined) state.overviewIndustry=industry;
     }
     if(key==="overviewBand") {
       const [index,year] = value.split("|").map(Number);
@@ -830,7 +855,8 @@
     }
     const key=e.target.dataset.control;
     if(!key || e.target.type==="number") return;
-    if(key==="hiringIndustry") {
+    if(key==="overviewIndustry") state.overviewIndustry=e.target.value==="all"?null:Number(e.target.value);
+    else if(key==="hiringIndustry") {
       if(e.target.value==="multiple") return;
       setIndustryFilter(e.target.value==="all"?[]:[e.target.value],[]);
     }

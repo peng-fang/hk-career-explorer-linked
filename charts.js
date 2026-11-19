@@ -62,14 +62,14 @@
         draw += `${pen ? "L" : "M"}${a.x(x)},${a.y(y)} `;
         pen = true;
       }
-      out += `<path d="${draw}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
+      out += `<path d="${draw}" fill="none" stroke="${s.color}" stroke-width="${s.strokeWidth ?? 2.4}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
       for (const [x,y,extra] of s.points) {
         if (!Number.isFinite(y)) continue;
         const tip = extra ?? `${s.name} · ${(opt.xFormat ?? number)(x)} · ${(opt.yFormat ?? number)(y)}`;
         const selected = x === opt.refX;
         const r = selected ? 4.7 : s.points.length > 55 ? 2.1 : 3.1;
         const action = !opt.canSelect || opt.canSelect(x) ? opt.action : null;
-        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,x,undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
+        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,s.pointValue?.(x) ?? x,undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
       }
     }
     return svg(w,h,opt.label,out);
@@ -78,7 +78,7 @@
   function stack(w, sets, years, year) {
     const h = 246;
     const a = axes(w,h,{x:[years[0],years.at(-1)], y:[0,100], yFormat: percent,
-      xTicks: years.filter((_,i)=>i%4===0 || i===years.length-1)});
+      xFormat: String, xTicks: years.filter((_,i)=>i===years.length-1 || (i%4===0 && i<years.length-2))});
     let base = years.map(()=>0);
     let content = a.grid;
     let targets = "";

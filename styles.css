@@ -198,6 +198,9 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .decision .chip-row { margin-top: 8px; }
 .subhead { padding: 21px 0 10px; }
 .subhead h2 { font-size: 20px; }
+#structure-data > .subhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; padding-block-start: 0; }
+#structure-data > .subhead a { font-size: 13px; }
+#structure-data + .profile-card { margin-block-start: 16px; }
 .source-card { max-width: 930px; gap: 9px; }
 .source-card a { color: #64367b; text-decoration: underline; text-underline-offset: 2px; }
 .source-card ul { margin: 0; padding-left: 20px; }
@@ -214,9 +217,6 @@ button.secondary-link { padding: 0; border: 0; background: transparent; }
 .filter-panel fieldset { display: grid; gap: 2px; margin: 7px 0 0; padding: 0; border: 0; max-height: 240px; overflow: auto; }
 .filter-panel label { display: flex; align-items: flex-start; gap: 7px; padding: 4px 3px; cursor: pointer; font-size: 13px; }
 .filter-panel input { margin-top: 3px; accent-color: var(--plum); }
-.appendix { margin: 17px 0; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius); background: #fcf9f5; }
-.appendix > summary { font-weight: 750; color: var(--plum); }
-.appendix[open] > summary { margin-bottom: 13px; }
 .profile-card h2, .pair-review h2, .empty-state h2 { font-size: 21px; line-height: 1.3; }
 .profile-card > .field input, .pair-note input {
   box-sizing: border-box; width: 100%; min-width: 0; min-height: 37px; font: inherit;
