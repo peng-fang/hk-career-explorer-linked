@@ -55,41 +55,22 @@
     if (Number.isFinite(opt.refX) && opt.refX >= d.x[0] && opt.refX <= d.x[1]) {
       out += line(a.x(opt.refX),a.top,a.x(opt.refX),a.bottom,"refline");
     }
-    if (opt.shadeBetween) {
-      const [first, second] = sets.map(s => new Map(s.points.filter(p=>Number.isFinite(p[1])).map(p=>p.slice(0,2))));
-      const shared = [...first.keys()].filter(x=>second.has(x));
-      const edge = (keys, values) => keys.map(x=>`${a.x(x)},${a.y(values.get(x))}`);
-      out += `<polygon points="${[...edge(shared,first),...edge(shared.slice().reverse(),second)].join(" ")}" fill="${rose}" opacity=".14"/>`;
-    }
-    for (const marker of opt.markers ?? []) {
-      out += `<g ${mark(marker.tip,opt.action,marker.x,marker.x===opt.refX,`marker:${marker.x}`)}>`
-        + line(a.x(marker.x),a.top+8,a.x(marker.x),a.bottom,"refline")
-        + `<circle cx="${a.x(marker.x)}" cy="${a.top+7}" r="4.5" fill="${rose}"/></g>`;
-    }
     for (const s of sets) {
-      const opacity = opt.active && opt.active!==s.key ? .23 : 1;
-      out += `<g opacity="${opacity}"${s.key===undefined?"":` data-series-key="${esc(s.key)}"`}>`;
       let draw = "", pen = false;
       for (const [x,y] of s.points) {
         if (!Number.isFinite(y)) { pen = false; continue; }
         draw += `${pen ? "L" : "M"}${a.x(x)},${a.y(y)} `;
         pen = true;
       }
-      if (!opt.pointsOnly) {
-        const path = `d="${draw}" fill="none" stroke-linejoin="round" stroke-linecap="round"`;
-        out += `<path ${path} stroke="${s.color}" stroke-width="2.4"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
-        if (opt.seriesAction) out += `<path ${path} style="stroke:transparent;stroke-width:14" ${mark(s.name,opt.seriesAction,s.key,opt.active===s.key,`series:${s.key}`)}/>`;
-      }
+      out += `<path d="${draw}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ' stroke-dasharray="5 3"' : ""}/>`;
       for (const [x,y,extra] of s.points) {
         if (!Number.isFinite(y)) continue;
         const tip = extra ?? `${s.name} · ${(opt.xFormat ?? number)(x)} · ${(opt.yFormat ?? number)(y)}`;
         const selected = x === opt.refX;
-        const r = selected ? 4.7 : opt.pointsOnly ? 4 : s.points.length > 55 ? 2.1 : 3.1;
-        const action = opt.seriesAction ?? ((!opt.canSelect || opt.canSelect(x)) ? opt.action : null);
-        const value = opt.seriesAction ? s.key : x;
-        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,value,opt.seriesAction ? opt.active===s.key : undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
+        const r = selected ? 4.7 : s.points.length > 55 ? 2.1 : 3.1;
+        const action = !opt.canSelect || opt.canSelect(x) ? opt.action : null;
+        out += `<circle cx="${a.x(x)}" cy="${a.y(y)}" r="${r}" fill="${s.color}" ${mark(tip,action,x,undefined,`${action}:${s.key ?? s.name}:${x}`)}/>`;
       }
-      out += "</g>";
     }
     return svg(w,h,opt.label,out);
   }
@@ -154,14 +135,6 @@
         : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i)).join("")}</div>`;
       return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}${axis}</div>`;
-  }
-
-  function splitBars(rows, labels, palette) {
-    return `<div class="bars">${rows.map(r=>`<div class="bar-row"><span class="name">${esc(r.name)}</span>
-      <div class="split-row"><div class="split-track">${r.values.map((v,i)=>
-        `<span style="width:${v}%;background:${palette[i]}" data-tip="${esc(r.tips[i])}"></span>`).join("")}</div>
-      <div class="split-values">${r.values.map((v,i)=>`<span>${esc(labels[i])} ${percent(v)}</span>`).join("")}</div>
-      </div></div>`).join("")}</div>`;
   }
 
   function donut(rows) {
@@ -241,5 +214,5 @@
     return svg(w,h,t("个人生活预算瀑布图","Monthly budget waterfall chart"),content);
   }
 
-  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,splitBars,donut,treemap,bubbles,waterfall};
+  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall};
 })();
