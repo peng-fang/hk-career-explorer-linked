@@ -133,7 +133,7 @@
       const tracks = opt.mirror
         ? `<div class="mirror">${r.values.map((_,i)=>`<span class="half">${draw(r,i)}</span>`).join("")}</div>`
         : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i)).join("")}</div>`;
-      return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
+      return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${esc(opt.highlightLabel ?? t("所选方向所属大类","Category covering a pick"))}</span>` : ""}</span>${tracks}</div>`;
     }).join("")}${axis}</div>`;
   }
 

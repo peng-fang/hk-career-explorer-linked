@@ -26,10 +26,15 @@
   ];
   const defaultWageRate = 1.0828;
   const wageRateSource = "https://www.censtatd.gov.hk/en/data/stat_report/product/B1010003/att/B10100032025AN25B0100.pdf";
+  const wageAgeGroups = {
+    finance:"金融地产商务", information:"信息通讯", construction:"建筑业", manufacturing:"制造业",
+    "land-transport":"运输仓储邮政", "real-estate":"金融地产商务", wholesale:"批发零售/进出口",
+    retail:"批发零售/进出口", accommodation:"住宿餐饮", food:"住宿餐饮",
+  };
   const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,...saved} = pathway.load();
   const state = {
     marketPeriod:"latest", overviewYear:2025, marketRegion:"", overviewIndustry:null,
-    wageRate:defaultWageRate,
+    wageRate:defaultWageRate, wageCurrency:"CNY", wageSort:"hk", wageIndustry:"",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
@@ -91,10 +96,11 @@
     const ageMax = Math.ceil(Math.max(5,...snapshot.map(r=>r.value).filter(Number.isFinite))/5)*5;
     const industryMax = Math.ceil(Math.max(10,...industryAge.map(r=>r.value).filter(Number.isFinite).map(v=>100-v))/10)*10;
     const paired = rows => [...by(rows,"order")].sort(([a],[b])=>a-b).map(([,rs])=>({
-      name:label(rs[0].label), values:["内地","香港"].map(region=>rs.find(r=>r.region===region)?.value),
+      key:rs[0].label, name:label(rs[0].label), values:["内地","香港"].map(region=>rs.find(r=>r.region===region)?.value),
     }));
     const aged35AndOver = paired(current).map(row=>({
       ...row, values:row.values.map(value=>Number.isFinite(value) ? 100-value : value),
+      highlighted:row.key===wageAgeGroups[state.wageIndustry],
     }));
     const palette = [purple,rose], regionKeys = ["内地","香港"], regions = regionKeys.map(label);
     const active = state.marketRegion;
@@ -113,6 +119,7 @@
           {key:keys("ages")})
       + figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
           c.bars(aged35AndOver,{...regionPlot,max:industryMax,ticks:[0,industryMax/3,industryMax*2/3,industryMax],
+            highlightLabel:t("所选工资行业所属大类","Group covering the selected wage industry"),
             label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
           t("占比以各地各行业就业人数为分母，由 100% 减去 35 岁以下占比得到。两地统计时点相差一年，内地行业数据含项目估计。点击地区可同步突出两张年龄图。",
             "Shares use each industry’s workforce as the denominator and equal 100% minus the under-35 share. Snapshots are one year apart, and Mainland figures include project estimates. Select a market to highlight it in both age charts."),
@@ -148,9 +155,53 @@
     const data = d.payComparison ?? [];
     if (!data.length) return "";
     const rate = state.wageRate;
-    const unitColumns = `<th scope="col"><span class="wage-value">${t("人民币／月","CNY/month")}</span></th><th scope="col"><span class="wage-value">${t("港元／月","HKD/month")}</span></th>`;
+    const cnyUnit = t("人民币／月","CNY/month"), hkdUnit = t("港元／月","HKD/month");
+    const inCny = state.wageCurrency === "CNY";
+    const unit = inCny ? cnyUnit : hkdUnit;
+    const amount = value => number(Math.round(value) || 0);
+    const sz = t("深圳","Shenzhen"), hk = t("香港","Hong Kong");
+    const difference = t("差额（香港 − 深圳）","Gap (Hong Kong − Shenzhen)");
+    const unitColumns = [cnyUnit,hkdUnit].map(value=>`<th scope="col"><span class="wage-value">${value}</span></th>`).join("");
     const title = t("深圳与香港的行业月薪中位数","Median monthly wages in Shenzhen and Hong Kong");
+    const sortLabels = {
+      hk:t("香港月薪","Hong Kong wage"), sz:t("深圳月薪","Shenzhen wage"), gap:t("两地差额","Wage gap"),
+    };
+    const rows = data.filter(row=>row.id!=="all").map(row=>{
+      const sz = row.sz/12 * (inCny ? 1 : rate);
+      const hk = row.hk / (inCny ? rate : 1);
+      return {id:row.id, name:t(row.nameZh,row.nameEn), sz, hk, gap:hk-sz, note:t(row.noteZh,row.noteEn)};
+    }).sort((a,b)=>b[state.wageSort]-a[state.wageSort]);
+    const highest = Math.max(...rows.flatMap(row=>[row.sz,row.hk]));
+    const magnitude = 10 ** Math.floor(Math.log10(highest/4));
+    const step = [1,2,2.5,5,10].find(value=>value*magnitude>=highest/4)*magnitude;
+    const tickCount = Math.ceil(highest/step);
+    const position = value => (100 * value / (step*tickCount)).toFixed(4) + "%";
+    const tickFormat = new Intl.NumberFormat(language.code(),{notation:"compact",maximumFractionDigits:1});
+    const gapText = value => (Math.round(value)>0 ? "+" : "") + amount(value);
+    const chart = `<div class="wage-chart" role="group" aria-label="${esc(t("按行业比较两地月薪和差额","Compare monthly wages and gaps by industry"))}">
+      <div class="wage-chart-row wage-chart-axis" aria-hidden="true">
+        <span class="wage-track wage-ticks">${span(0,tickCount).map(i=>`<span style="left:${position(i*step)}">${tickFormat.format(i*step)}</span>`).join("")}</span>
+        <span class="wage-gap">${difference}</span>
+      </div>
+      ${rows.map(row=>{
+        const active = state.wageIndustry===row.id;
+        const tip = [row.name, `${sz} ${amount(row.sz)} ${unit}`, `${hk} ${amount(row.hk)} ${unit}`,
+          `${difference} ${gapText(row.gap)} ${unit}`, row.note].filter(Boolean).join("\n");
+        return `<button type="button" class="wage-chart-row wage-choice" data-action="wageIndustry" data-value="${row.id}"
+          data-focus="wageIndustry:${row.id}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${active}">
+          <span class="wage-industry">${esc(row.name)}</span>
+          <span class="wage-track" style="--sz-position:${position(row.sz)};--hk-position:${position(row.hk)}" aria-hidden="true">
+            <span class="wage-connector"></span>
+            <span class="wage-point wage-sz" style="--point:${purple}"><b>${amount(row.sz)}</b></span>
+            <span class="wage-point wage-hk" style="--point:${rose}"><b>${amount(row.hk)}</b></span>
+          </span>
+          <span class="wage-gap">${gapText(row.gap)}</span>
+        </button>`;
+      }).join("")}
+    </div>`;
     const fx = `<form class="control-bar wage-exchange" data-wage-exchange>
+      ${select("wageCurrency",t("图表币种","Chart currency"),["CNY","HKD"],value=>value==="CNY"?cnyUnit:hkdUnit)}
+      ${select("wageSort",t("从高到低排序","Sort high to low"),Object.keys(sortLabels),value=>sortLabels[value])}
       <label class="field" for="wageRate">${t("汇率（1 人民币兑多少港元）","Exchange rate (HKD per CNY)")}
         <input id="wageRate" type="number" min="0.0001" max="100" step="any" required value="${rate}"></label>
       <button class="chip" type="submit" id="apply-wage-rate">${t("应用汇率","Apply rate")}</button>
@@ -160,17 +211,25 @@
     const amountTable = `<div class="table-scroll" tabindex="0" aria-label="${title}">
       <table class="compact-table wage-table">
         <colgroup><col></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup><colgroup><col class="wage-amount-column" span="2"></colgroup>
-        <thead><tr><th scope="col" rowspan="2">${t("行业","Industry")}</th><th scope="colgroup" colspan="2">${t("深圳","Shenzhen")}</th><th scope="colgroup" colspan="2">${t("香港","Hong Kong")}</th></tr>
+        <thead><tr><th scope="col" rowspan="2">${t("行业","Industry")}</th><th scope="colgroup" colspan="2">${sz}</th><th scope="colgroup" colspan="2">${hk}</th></tr>
         <tr>${unitColumns}${unitColumns}</tr></thead>
         <tbody>${data.map(row=>{
           const name = row.id==="all" ? t("全行业","All covered industries") : t(row.nameZh,row.nameEn);
           const szMonthly = row.sz/12;
-          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td><span class="wage-value">${number(Math.round(value))}</span></td>`).join("")}</tr>`;
+          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td><span class="wage-value">${amount(value)}</span></td>`).join("")}</tr>`;
         }).join("")}</tbody></table></div>`;
+    const key = `<div class="legend wage-key" aria-label="${unit}">
+      <span><i style="background:${purple}"></i>${sz}</span><span><i class="wage-key-circle" style="background:${rose}"></i>${hk}</span>
+      <span>${unit}</span>
+    </div>`;
+    const selected = rows.find(row=>row.id===state.wageIndustry);
+    const ageChartLink = `<a class="secondary-link" href="#industry-age" data-scroll="industry-age">${t("行业年龄占比图","the industry age chart")}</a>`;
+    const selection = selected ? `<p class="mode-note wage-selection">${esc(selected.note)} ${t(`对应大类已在${ageChartLink}中标出。`,`The corresponding group is highlighted in ${ageChartLink}.`)}</p>` : "";
     return figure("pay-comparison",title,t("2024 年 · 男女合计 · 金额取整","2024 · Both sexes combined · Rounded to whole currency units"),
-      fx + amountTable,
-      t("深圳采用全年工资中位数除以 12，香港采用 5–6 月调查期的月薪中位数。两地金额按同一汇率换算。行业范围差异见各行说明。专业及商业服务、社会及个人服务缺少可对应的整体中位数。",
-        "Shenzhen’s annual median is divided by 12. Hong Kong uses the median monthly wage from its May–June survey. Both use the same exchange rate. See row notes for differences in industry coverage. Comparable overall medians are unavailable for professional and business services and for social and personal services."));
+      fx + key + chart + selection
+        + `<details class="wage-details" id="wage-details" data-persist-open><summary>${t("查看原始金额与行业对应","View source amounts and industry coverage")}</summary>${amountTable}</details>`,
+      t("点选行业，可在行业年龄占比图中查看对应大类。深圳采用全年工资中位数除以 12，香港采用 5–6 月调查期的月薪中位数。两地金额按同一汇率换算。行业范围差异见各行说明。专业及商业服务、社会及个人服务缺少可对应的整体中位数。",
+        "Select an industry to see its broader group in the industry age chart. Shenzhen’s annual median is divided by 12. Hong Kong uses the median monthly wage from its May–June survey. Both use the same exchange rate. See row notes for differences in industry coverage. Comparable overall medians are unavailable for professional and business services and for social and personal services."));
   }
 
   function structure() {
@@ -732,6 +791,7 @@
     }
     if(key==="marketPeriod") state.marketPeriod=value;
     if(key==="marketRegion") state.marketRegion=state.marketRegion===value?"":value;
+    if(key==="wageIndustry") state.wageIndustry=state.wageIndustry===value?"":value;
     if(key==="resetWageRate") state.wageRate=defaultWageRate;
     if(key==="overviewYear") {
       const [year,industry] = value.split("|").map(Number);
