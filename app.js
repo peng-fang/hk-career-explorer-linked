@@ -24,8 +24,11 @@
     item("fit",["试算个人条件","Test my criteria"],["工资、工时和生活费怎么算？","How do pay, hours and costs add up?"],["这些方向，能支撑我想要的香港生活吗？","Could these options support the life I want in Hong Kong?"],
       ["带入你选的行业和职业组合，用行业工资、工时和每月开支试算。调整一个条件，看看哪些方向仍值得优先投递。","Test your selected industry and occupation pairs against industry pay, working hours and your monthly costs. Change one assumption and see which options still look worth applying for first."]),
   ];
+  const defaultWageRate = 1.0828;
+  const wageRateSource = "https://www.censtatd.gov.hk/en/data/stat_report/product/B1010003/att/B10100032025AN25B0100.pdf";
   const state = {
     marketPeriod:"latest", overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
+    wageRate:defaultWageRate,
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
@@ -164,23 +167,30 @@
 
   function shenzhenHongKongPay() {
     const data = d.payComparison ?? [];
-    const baseline = data.find(row=>row.id==="all");
-    if (!baseline) return "";
-    const industries = data.filter(row=>row.id!=="all");
-    const cities = [t("深圳","Shenzhen"),t("香港","Hong Kong")];
-    const title = t("深圳与香港的行业工资比较","Industry wages in Shenzhen and Hong Kong");
-    const index = row=>[row.sz/baseline.sz*100,row.hk/baseline.hk*100];
-    const bars = industries.map(row=>({name:t(row.nameZh,row.nameEn),values:index(row)}));
-    const amountTable = `<details class="appendix pay-amounts" id="pay-comparison-amounts"><summary>${t("查看原币种金额与行业对应","See local-currency amounts and industry matches")}</summary>
-      <div class="table-scroll" tabindex="0" aria-label="${t("深圳和香港的原币种工资中位数，可横向滚动","Salary medians in local currencies, scrolls horizontally")}">
-        <table class="compact-table"><thead><tr><th scope="col">${t("行业","Industry")}</th><th scope="col">${t("深圳 · 人民币／年","Shenzhen · CNY/year")}</th><th scope="col">${t("香港 · 港元／月","Hong Kong · HKD/month")}</th></tr></thead>
-        <tbody>${[baseline,...industries].map(row=>`<tr><th scope="row">${esc(t(row.nameZh,row.nameEn))}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th><td>${number(row.sz)}</td><td>${number(row.hk)}</td></tr>`).join("")}</tbody></table>
-      </div></details>`;
-    return figure("pay-comparison",title,t("2024 年 · 男女合计 · 各自全行业工资中位数 = 100","2024 · All employees · Each market’s overall median = 100"),
-      c.bars(bars,{labels:cities,colors:[purple,rose],max:Math.max(240,...bars.flatMap(row=>row.values)),reference:100,format:n=>number(Math.round(n)),label:title}) + amountTable,
-      t("120 表示该行业工资中位数比当地整体高 20%。深圳统计企业从业人员全年工资，香港统计 5–6 月调查期内的雇员月薪。两地薪酬构成和覆盖范围有差异，指数用于观察各行业在当地的相对水平。",
-        "An index of 120 means the industry median is 20% above its local overall median. Shenzhen measures annual pay of enterprise workers. Hong Kong measures employees’ monthly wages in its May–June survey. Wage components and coverage differ, so read the bars as relative industry positions."),
-      {key:legend([[cities[0],purple],[cities[1],rose]])+`<p class="mode-note pay-benchmark">${t("虚线为当地整体中位数（100）","Dashed line marks each market’s overall median (100)")}</p>`,full:true});
+    if (!data.length) return "";
+    const rate = state.wageRate;
+    const unitColumns = `<th scope="col">${t("人民币／月","CNY/month")}</th><th scope="col">${t("港元／月","HKD/month")}</th>`;
+    const title = t("深圳与香港的行业月薪中位数","Median monthly wages in Shenzhen and Hong Kong");
+    const fx = `<form class="control-bar wage-exchange" data-wage-exchange>
+      <label class="field" for="wageRate">${t("汇率（1 人民币兑多少港元）","Exchange rate (HKD per CNY)")}
+        <input id="wageRate" type="number" min="0.0001" max="100" step="any" required value="${rate}"></label>
+      <button class="chip" type="submit" id="apply-wage-rate">${t("应用汇率","Apply rate")}</button>
+      ${chip("resetWageRate","default",t("恢复默认","Reset to default"))}
+      <p class="mode-note"><a class="secondary-link" href="${wageRateSource}">${t(`2024 年平均汇率（1 人民币 = ${defaultWageRate} 港元）`,`2024 average exchange rate (CNY 1 = HKD ${defaultWageRate})`)}</a></p>
+      </form>`;
+    const amountTable = `<div class="table-scroll" tabindex="0" aria-label="${title}">
+      <table class="compact-table wage-table"><colgroup></colgroup><colgroup span="2"></colgroup><colgroup span="2"></colgroup>
+        <thead><tr><th scope="col" rowspan="2">${t("行业","Industry")}</th><th scope="colgroup" colspan="2">${t("深圳","Shenzhen")}</th><th scope="colgroup" colspan="2">${t("香港","Hong Kong")}</th></tr>
+        <tr>${unitColumns}${unitColumns}</tr></thead>
+        <tbody>${data.map(row=>{
+          const name = row.id==="all" ? t("全行业","All covered industries") : t(row.nameZh,row.nameEn);
+          const szMonthly = row.sz/12;
+          return `<tr><th scope="row">${esc(name)}${row.noteZh?`<span class="subcell">${esc(t(row.noteZh,row.noteEn))}</span>`:""}</th>${[szMonthly,szMonthly*rate,row.hk/rate,row.hk].map(value=>`<td>${number(Math.round(value))}</td>`).join("")}</tr>`;
+        }).join("")}</tbody></table></div>`;
+    return figure("pay-comparison",title,t("2024 年 · 男女合计 · 金额取整","2024 · Both sexes combined · Rounded to whole currency units"),
+      fx + amountTable,
+      t("深圳月度等值为调查年薪除以 12，香港采用 5–6 月调查期内的月薪。人民币乘汇率得港元，港元除以汇率得人民币。行业按工资调查可对应的分组列示。专业及商业服务、社会及个人服务缺少可对应的整体中位数。",
+        "Shenzhen’s monthly equivalent is annual pay divided by 12. Hong Kong uses monthly wages from the May–June survey. Multiply CNY by the rate to get HKD, and divide HKD by the rate to get CNY. Rows follow comparable wage survey groups. Comparable broad medians are unavailable for professional and business services and for social and personal services."),{full:true});
   }
 
   function structure() {
@@ -643,8 +653,9 @@
       <li><a href="https://genderdata.worldbank.org/en/economies/china">${t("世界银行 · 内地劳动参与率","World Bank · Mainland participation")}</a> ·
         <a href="https://genderdata.worldbank.org/en/economies/hong-kong-sar-china">${t("世界银行 · 香港劳动参与率","World Bank · Hong Kong participation")}</a>${t("。2025 年男女数据均为 ILO 15 岁及以上模型估计。",". The 2025 figures are ILO modelled estimates for ages 15 and above, by sex.")}</li>
       <li><a href="https://www.sz.gov.cn/attachment/1/1703/1703629/12735140.pdf">${t("深圳市人社局工资价位（第一部分，页 5、15–16）","Shenzhen wage benchmark report (Part I, pp. 5, 15–16)")}</a> ·
-        <a href="https://www.censtatd.gov.hk/wbr/B1050014/B10500142024AN24/att/en/B10500142024AN24.pdf">${t("香港政府统计处 2024 年收入及工时调查（表 6.10）","Hong Kong C&SD 2024 Annual Earnings and Hours Survey (Table 6.10)")}</a>${t("。深港指数为本地行业工资中位数除以本地全行业工资中位数，再乘 100。深圳是 2024 全年工资，香港是 2024 年 5–6 月调查期工资。仅配对范围较接近的行业。",
-          ". Each index divides an industry’s median wage by the same market’s overall median and multiplies by 100. Shenzhen covers full-year 2024 pay. Hong Kong covers the May–June survey period. Only broadly aligned industries are paired.")}</li>
+        <a href="https://www.censtatd.gov.hk/wbr/B1050014/B10500142024AN24/att/en/B10500142024AN24.pdf">${t("香港政府统计处 2024 年收入及工时调查（表 6.10）","Hong Kong C&SD 2024 Annual Earnings and Hours Survey (Table 6.10)")}</a> ·
+        <a href="${wageRateSource}">${t("2024 年平均汇率","2024 average exchange rate")}</a>${t("。深圳是 2024 年全年工资除以 12，香港是 2024 年 5–6 月调查期月薪。两地均显示人民币和港元，原调查的工资构成和覆盖范围有差异。",
+          ". Shenzhen is full-year 2024 pay divided by 12. Hong Kong is the monthly wage from the May–June survey. Both are displayed in CNY and HKD. The underlying surveys differ in wage components and coverage.")}</li>
       <li>${t("分性别行业收入的口径核对见","For the coverage check on industry earnings by sex, see")}
         <a href="https://www.stats.gov.cn/sj/zxfbhjd/202605/t20260515_1963707.html">${t("国家统计局城镇单位年平均工资","NBS average annual wages in urban units")}</a> ·
         <a href="https://ilostat.ilo.org/topics/wages/">ILOSTAT</a> ·
@@ -767,6 +778,7 @@
   function action(e,el) {
     const key=el.dataset.action, value=el.dataset.value;
     if(key==="marketPeriod") state.marketPeriod=value;
+    if(key==="resetWageRate") state.wageRate=defaultWageRate;
     if(key==="overviewYear") {
       if (+value<2016) return;
       state.overviewYear=+value;
@@ -891,6 +903,12 @@
     pathway.save(state);
   });
   main.addEventListener("submit",e=>{
+    if(e.target.matches("[data-wage-exchange]")) {
+      e.preventDefault();
+      state.wageRate=$("wageRate").valueAsNumber;
+      render(e.submitter?.id);
+      return;
+    }
     if(!e.target.matches("[data-budget-form]")) return;
     e.preventDefault();
     for(const input of e.target.querySelectorAll("input[type=number]")) {

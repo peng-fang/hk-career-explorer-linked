@@ -128,10 +128,10 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 .bar-row .bars-track { display: flex; flex-direction: column; gap: 4px; position: relative; }
 .bar-row .bar { border-radius: 0 4px 4px 0; position: relative; height: 12px; min-width: 2px; }
 .bar-row .bar b { left: calc(100% + 5px); top: 50%; transform: translateY(-50%); position: absolute; font: 650 10px/1 system-ui, sans-serif; white-space: nowrap; }
-.bar-reference { position: absolute; top: -2px; bottom: -2px; z-index: 1; border-left: 1px dashed var(--plum); pointer-events: none; }
-.pay-benchmark { margin: -3px 0 7px; }
-.appendix.pay-amounts { margin: 8px 0 0; padding: 4px 10px; }
-.pay-amounts summary { color: var(--plum); font-weight: 700; padding: 5px 0; }
+.wage-exchange input { width: 126px; min-height: 35px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); }
+.wage-exchange .mode-note { align-self: center; }
+.wage-table th[scope="colgroup"] { text-align: center; }
+.wage-table td { white-space: nowrap; }
 .bar-single .bar { height: 14px; }
 .bar-row .mirror { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; align-items: center; }
 .mirror .half { display: flex; min-width: 0; }
