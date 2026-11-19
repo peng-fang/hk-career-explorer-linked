@@ -129,10 +129,12 @@
 
   function bars(rows, opt = {}) {
     const max = opt.max ?? Math.max(1, ...rows.flatMap(r=>r.values.filter(Number.isFinite)));
-    const draw = (row,i,cap) => {
+    const cap = opt.ticks ? 100 : opt.mirror ? 64 : 73;
+    const format = opt.format ?? number;
+    const draw = (row,i) => {
       const v = row.values[i];
       if (!Number.isFinite(v)) return "<span>—</span>";
-      const value = (opt.format ?? number)(v);
+      const value = format(v);
       const key = opt.keys?.[i] ?? row.key;
       const pressed = opt.active===key;
       const tip = [row.name,opt.labels?.[i],value].filter(Boolean).join(" · ");
@@ -142,12 +144,16 @@
         ? `<button type="button" class="bar chart-bar${dimmed}" style="${style}" aria-label="${esc(tip)}" aria-pressed="${pressed}" data-tip="${esc(tip)}" data-action="${opt.action}" data-value="${esc(key)}" data-focus="${esc(`${opt.action}:${opt.label}:${row.name}:${i}`)}"><b>${esc(value)}</b></button>`
         : `<span class="bar" style="${style}" data-tip="${esc(tip)}"><b>${esc(value)}</b></span>`;
     };
+    const axis = opt.ticks ? `<div class="bar-row" aria-hidden="true"><div class="bar-scale">${opt.ticks.map(v=>{
+      const position = opt.mirror ? (v/max+1)*50 : v/max*100;
+      return `<span style="left:${position}%">${esc(format(Math.abs(v)))}</span>`;
+    }).join("")}</div></div>` : "";
     return `<div class="bars" role="group" aria-label="${esc(opt.label ?? t("条形图","Bar chart"))}">${rows.map(r=>{
       const tracks = opt.mirror
-        ? `<div class="mirror">${r.values.map((_,i)=>`<span class="half">${draw(r,i,64)}</span>`).join("")}</div>`
-        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i,73)).join("")}</div>`;
+        ? `<div class="mirror">${r.values.map((_,i)=>`<span class="half">${draw(r,i)}</span>`).join("")}</div>`
+        : `<div class="bars-track${r.values.length===1 ? " bar-single" : ""}">${r.values.map((_,i)=>draw(r,i)).join("")}</div>`;
       return `<div class="bar-row${r.highlighted?' bar-highlight':''}"><span class="name">${esc(r.name)}${r.highlighted ? `<span class="highlight-label">${t("所选方向所属大类","Category covering a pick")}</span>` : ""}</span>${tracks}</div>`;
-    }).join("")}</div>`;
+    }).join("")}${axis}</div>`;
   }
 
   function splitBars(rows, labels, palette) {

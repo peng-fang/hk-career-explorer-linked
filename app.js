@@ -106,7 +106,10 @@
 
   function markets() {
     const snapshot = d.markets.filter(r=>r.kind==="A_2010年龄对照");
-    const current = d.markets.filter(r=>r.kind===(state.marketPeriod==="early"?"F_行业35_早期":"G_行业35_最新"));
+    const industryAge = d.markets.filter(r=>["F_行业35_早期","G_行业35_最新"].includes(r.kind));
+    const current = industryAge.filter(r=>r.kind===(state.marketPeriod==="early"?"F_行业35_早期":"G_行业35_最新"));
+    const ageMax = Math.ceil(Math.max(5,...snapshot.map(r=>r.value).filter(Number.isFinite))/5)*5;
+    const industryMax = Math.ceil(Math.max(10,...industryAge.map(r=>r.value).filter(Number.isFinite).map(v=>100-v))/10)*10;
     const paired = rows => [...by(rows,"order")].sort(([a],[b])=>a-b).map(([,rs])=>({
       name:label(rs[0].label), values:["内地","香港"].map(region=>rs.find(r=>r.region===region)?.value),
     }));
@@ -134,22 +137,24 @@
     return hero + heading(pages[0],0,"h2","market-compare")
       + `<div class="grid wide-pair market-ages">`
       + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
-          c.bars(paired(snapshot),{...regionPlot,mirror:true,max:18,label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
+          c.bars(paired(snapshot),{...regionPlot,mirror:true,max:ageMax,ticks:[-ageMax,-ageMax/2,0,ageMax/2,ageMax],
+            label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
           t("每行比较同一年龄段，左为内地、右为香港。沿用原表对齐分组，仅显示列出的年龄段，各列未重归一；两地就业统计定义有差异。",
             "Each row pairs the same age group: Mainland China on the left, Hong Kong on the right. The chart uses the original aligned groups and denominators. Employment definitions differ between the two markets."),
           {key:keys("ages")})
       + figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
-          c.bars(aged35AndOver,{...regionPlot,max:100,label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
+          c.bars(aged35AndOver,{...regionPlot,max:industryMax,ticks:[0,industryMax/3,industryMax*2/3,industryMax],
+            label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
           t("35 岁及以上占比为 100% 减去 35 岁以下占比，分母为各地各行业的就业人数。两地统计时点相差一年，内地细分数据为项目估计。用于观察年龄结构，岗位需求见下一章。",
             "The share aged 35 and over equals 100% minus the under-35 share. The denominator is each industry’s workforce. Snapshots are one year apart and Mainland industry breakdowns are project estimates. See the next chapter for vacancy data."),
           {key:keys("industry-age"),control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`})
+      + `</div>`
       + figure("middle-age",t("两地中年就业人口占比走势","Middle-age workforce trends"),"2010–2022 · %",
           series("middle-age-line",middleSets,{x:[2010,2022],xTicks:[2010,2013,2016,2019,2022],y:[55,85],
             yTicks:[55,65,75,85],yFormat:percent,active,seriesAction:"marketRegion",label:t("两地中年就业人口趋势","Middle-age workforce trends by market")}),
           t("内地采用 25–59 岁，香港采用 30–54 岁。两地年龄范围不同，各自观察趋势。点任一地区可在三张年龄图中同步突出它，再点一次恢复。",
             "Mainland China uses ages 25–59 and Hong Kong uses ages 30–54. Read each trend within its own age band. Select either market to highlight it across all three age charts, and select it again to reset."),
-          {key:keys("middle-age"),full:true})
-      + `</div>`
+          {key:keys("middle-age")})
       + marketEvidence()
       + `<div class="decision"><strong>${t("嘉宁决定先查香港的岗位，同时保留内地投递。","Jia Ning decides to explore Hong Kong vacancies while keeping her Mainland search open.")}</strong>
         <div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>

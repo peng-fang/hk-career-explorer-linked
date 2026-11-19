@@ -56,6 +56,7 @@ h1, h2, h3, p, figure { margin: 0; }
 .top-action { border-radius: 99px; border: 1px solid #d7c5db; color: var(--plum); font-weight: 720; padding: 7px 13px; }
 .top-action:hover, .source-link:hover { color: #482b5a; }
 main, .footer { max-width: 1520px; margin: auto; padding: 0 34px; }
+main:has(.market-ages) { max-width: none; }
 .loading { padding: 2rem 0; }
 .hero {
   min-height: 331px; display: grid; grid-template-columns: minmax(0, .91fr) minmax(0, 1fr);
@@ -80,7 +81,14 @@ main, .footer { max-width: 1520px; margin: auto; padding: 0 34px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; align-items: stretch; }
 .grid.wide-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 370px), 1fr)); }
 .budget-history { margin-top: 15px; }
+.market-ages { --value-gutter: 40px; }
+.market-ages + #middle-age { margin-block-start: 15px; }
 .market-ages #ages .bar-row { grid-template-columns: 48px minmax(0, 1fr); }
+.market-ages #ages .mirror { padding-inline: var(--value-gutter); }
+.market-ages #industry-age .bar-row { grid-template-columns: minmax(88px, 30%) minmax(0, 1fr); }
+.market-ages #industry-age .bars-track { margin-inline-end: var(--value-gutter); }
+.market-ages .bar-scale { grid-column: 2; margin-inline-end: var(--value-gutter); }
+.market-ages #ages .bar-scale { margin-inline-start: var(--value-gutter); }
 .span-full { grid-column: 1 / -1; }
 .card { border-radius: var(--radius); border: 1px solid var(--line); background: var(--cream); min-width: 0; padding: 18px; display: flex; flex-direction: column; }
 .card-head { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 5px 12px; margin-bottom: 9px; }
@@ -137,6 +145,8 @@ select, input[type="number"] { min-height: 36px; max-width: 100%; border: 1px so
 #participation:has([data-value="2005"]:hover) [data-series-key="2005"],
 #participation:has([data-value="2025"]:hover) [data-series-key="2025"] { opacity: 1; }
 .bar-row .bar b { left: calc(100% + 5px); top: 50%; transform: translateY(-50%); position: absolute; font: 650 10px/1 system-ui, sans-serif; white-space: nowrap; }
+.bar-scale { position: relative; border-top: 1px solid var(--line); height: 17px; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.bar-scale span { position: absolute; top: 2px; transform: translateX(-50%); white-space: nowrap; }
 .wage-exchange input { width: 126px; min-height: 35px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--cream); }
 .wage-exchange .mode-note { align-self: center; }
 .wage-table { table-layout: fixed; }
