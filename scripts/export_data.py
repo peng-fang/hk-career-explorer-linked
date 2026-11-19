@@ -38,6 +38,7 @@ def use_workbook(workbook):
     quality = records(workbook, "02_03")
     equity = records(workbook, "03_04")
     risk = records(workbook, "04_05")
+    market_context = records(workbook, "00_新增官方数据")
 
     def domain(name):
         return (row for row in quality if row["图表域"] == name)
@@ -63,6 +64,12 @@ def use_workbook(workbook):
             }),
             {"kind": "view", "region": "series", "label": "Age", "order": "x_order", "value": "value"},
             numeric=("order", "value"),
+        ),
+        "marketContext": project(
+            market_context,
+            {"indicator": "指标代码", "area": "地区代码", "period": "观察期", "nameZh": "分组",
+             "nameEn": "英文分组", "value": "原值"},
+            numeric=("value",),
         ),
         "total": project(
             (r for r in all_jobs if r["source_table"] == "employment_by_industry_annual"

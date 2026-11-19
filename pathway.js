@@ -70,18 +70,6 @@
   const exampleTaskOccupations = () => ({"data-analysis":professional});
   const pairKey = (id, occupation) => `${id}|${occupation}`;
   const findVacancy = (id, occupation) => globalThis.guideData.occupations.find(row => row.id === id && row.name === occupation);
-  const equityIndustry = {
-    ind_C:"Manufacturing",
-    ind_G45_46:"Import/export trade and wholesale",
-    ind_G47:"Retail, accommodation and food services",
-    ind_I:"Retail, accommodation and food services",
-    ind_H:"Transportation, storage, postal and courier services, information and communications",
-    ind_J:"Transportation, storage, postal and courier services, information and communications",
-    ind_K:"Financing, insurance, real estate, professional and business services",
-    ind_L:"Financing, insurance, real estate, professional and business services",
-    ind_M_N:"Financing, insurance, real estate, professional and business services",
-    ind_P_S:"Public administration, social and personal services",
-  };
 
   function suggestions(profile) {
     return rules.map(rule => {
@@ -115,6 +103,6 @@
 
   globalThis.guidePathway = {
     majors, interests, skills, occupationGroups, nameOf, emptyProfile, exampleProfile, exampleTaskOccupations,
-    pairKey, findVacancy, equityIndustry, suggestions, examplePairs, load, save,
+    pairKey, findVacancy, suggestions, examplePairs, load, save,
   };
 })();

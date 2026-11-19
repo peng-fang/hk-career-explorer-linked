@@ -17,17 +17,15 @@
     get question() { return t(...question); }, get summary() { return t(...summary); },
   });
   const pages = [
-    item("markets",["两地对照","Two markets"],["从哪里开始找？","Where should I start?"],["两地的就业结构，有什么不同？","How do the two workforces differ?"],
-      ["嘉宁先比较两地的年龄和行业结构。她用这一步找出值得深查的行业，然后查看香港的岗位分布。","Jia Ning compares age and industry profiles across the two markets. The patterns give her leads to investigate in Hong Kong."]),
+    item("markets",["两地对照","Two markets"],["香港值得深入看看吗？","Should I explore Hong Kong further?"],["毕业后，要不要把香港列为求职重点？","Should I focus my job search on Hong Kong?"],
+      ["嘉宁先看两地的行业结构，再了解年轻人就业形势和行业收入。她用这些信息决定要不要继续查香港的岗位，同时保留内地求职选项。","Jia Ning looks at industry structure, youth unemployment and earnings. She uses this context to decide whether to explore Hong Kong vacancies while keeping Mainland options open."]),
     item("structure",["发现方向","Discover options"],["从我的背景找方向","Explore options that fit my background"],["香港哪些行业在招我想做的工作？","Which Hong Kong industries hire for the work I want to do?"],
       ["先用专业、兴趣和技能找到可探索的职业组，再根据真实空缺选出想进一步查证的行业和职业组合。","Start with your studies, interests and skills. Use vacancy data to choose industry and occupation pairs worth investigating."]),
-    item("review",["核查风险与薪酬","Review risk and pay"],["投递前要查什么？","What should I check before applying?"],["求职需要多少缓冲，薪酬该怎样比较？","How much time should I allow, and what pay figures can I use?"],
-      ["用同龄人的失业率规划投递，再看和已选行业相关的收入大类。记下要核查的岗位条件，确认带入预算的方向。","Use age-group unemployment to plan your search. Then check earnings for the broader sectors that cover your picks. Save interview questions and confirm which options to take to the budget."]),
-    item("fit",["试算个人条件","Test my criteria"],["哪些方向符合我的条件？","Which options fit my criteria?"],["哪些方向值得优先查证？","Which options should I investigate first?"],
-      ["把已经复核的行业和职业组合带进来，用行业工资、工时和每月预算试算。调整一个条件，看看清单怎样变化。","Bring your reviewed industry and occupation pairs into the budget. Change one pay, hours or cost assumption and see how the shortlist changes."]),
+    item("fit",["试算个人条件","Test my criteria"],["工资、工时和生活费怎么算？","How do pay, hours and costs add up?"],["这些方向，能支撑我想要的香港生活吗？","Could these options support the life I want in Hong Kong?"],
+      ["带入你选的行业和职业组合，用行业工资、工时和每月开支试算。调整一个条件，看看哪些方向仍值得优先投递。","Test your selected industry and occupation pairs against industry pay, working hours and your monthly costs. Change one assumption and see which options still look worth applying for first."]),
   ];
   const state = {
-    marketPeriod:"latest", overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
+    marketPeriod:"latest", wageContextYear:2025, overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
@@ -81,7 +79,6 @@
   const series = (id,sets,options) => viz(id,w=>c.series(w,sets,options));
   const lineSet = (name,points,color=purple,dash=false) => ({name,points,color,dash});
   const mk = i => String(i).padStart(2,"0");
-  const next = i => `<a href="#${pages[i+1].id}" class="next"><span><small>${t("下一章","Next chapter")} · ${mk(i+1)}</small><strong>${pages[i+1].subtitle}</strong></span><span aria-hidden="true">→</span></a>`;
   const keyOf = pair => pathway.pairKey(pair.id,pair.occupation);
   const vacancyShare = row => Number.isFinite(row.share) ? percent(row.share * 100) : "—";
   const industryName = id => label(d.demand.find(row => row.id === id)?.name ?? id);
@@ -115,18 +112,69 @@
       <img class="hero-image" src="assets/harbour.webp" alt="${t("维多利亚港傍晚的香港岛天际线，生成示意图","Generated illustration of the Hong Kong Island skyline at dusk, across Victoria Harbour")}"></section>`;
     return hero + heading(pages[0],0,"h2","market-compare")
       + grid(
+        figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
+          c.bars(aged35AndOver,{colors:palette,labels:regions,max:100,format:percent,label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
+          t("35 岁及以上占比为 100% 减去 35 岁以下占比，分母为各地各行业的就业人数。两地统计时点相差一年，内地细分数据为项目估计。用于观察年龄结构，岗位需求见下一章。",
+            "The share aged 35 and over equals 100% minus the under-35 share. The denominator is each industry’s workforce. Snapshots are one year apart and Mainland industry breakdowns are project estimates. See the next chapter for vacancy data."),
+          {key:keys,full:true,control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`}))
+      + appendix("market-ages",t("查阅两地就业人口年龄结构（2010 年）","Explore workforce age profiles (2010)"),
         figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
           c.bars(paired(snapshot),{colors:palette,labels:regions,mirror:true,max:18,format:percent,label:t("2010年两地就业人口年龄结构镜像图","Mirrored bars comparing the age profiles of both workforces in 2010")}),
           t("每行比较同一年龄段，左为内地、右为香港。沿用原表对齐分组，仅显示列出的年龄段，各列未重归一；两地就业统计定义有差异。",
             "Each row pairs the same age group: Mainland China on the left, Hong Kong on the right. The chart uses the original aligned groups and denominators. Employment definitions differ between the two markets."),
-          {key:keys}),
-        figure("industry-age",t("各行业 35 岁及以上就业占比","Workers aged 35 and over by industry"),era,
-          c.bars(aged35AndOver,{colors:palette,labels:regions,max:100,format:percent,label:t("两地各行业 35 岁及以上就业占比","Share of workers aged 35 and over by industry and market")}),
-          t("35 岁及以上占比为 100% 减去 35 岁以下占比，分母为各地各行业的就业人数。两地统计时点相差一年，行业沿用项目合并分类。内地细分数据为项目估计，适合观察结构。",
-            "The share aged 35 and over equals 100% minus the under-35 share. The denominator is each industry’s workforce in each market. The snapshots are one year apart. Industry groups are aligned, and Mainland breakdowns are estimated for broad comparisons."),
-          {key:keys,control:`<div class="chip-row">${chip("marketPeriod","early",t("早期","Earlier"),state.marketPeriod==="early")}${chip("marketPeriod","latest",t("较新","More recent"),state.marketPeriod==="latest")}</div>`}))
-      + `<div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁","Follow Jia Ning")} →</a>
-      <a class="secondary-link" href="#structure">${t("自己探索","Explore with my own choices")} →</a></div>`;
+          {key:keys}))
+      + marketEvidence()
+      + `<div class="decision"><strong>${t("嘉宁决定先查香港的岗位，同时保留内地投递。","Jia Ning decides to explore Hong Kong vacancies while keeping her Mainland search open.")}</strong>
+        <div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>
+        <a class="secondary-link" href="#structure">${t("用我的背景探索","Explore with my own background")}</a></div></div>`;
+  }
+
+  function marketEvidence() {
+    const data = d.marketContext;
+    const cn = t("内地","Mainland China"), hk = t("香港","Hong Kong");
+    const group = row => t(row.nameZh,row.nameEn);
+    const unemployment = (area,title,period,note,color,max) => {
+      const rows = data.filter(row=>row.indicator==="unemployment" && row.area===area);
+      return figure(`unemployment-${area}`,title,period+t(` · 本图 0–${max}%`,` · Local scale 0–${max}%`),
+        c.bars(rows.map(row=>({name:group(row),values:[row.value]})),{colors:[color],max,format:percent,label:title}),
+        note);
+    };
+    const participationRows = data.filter(row=>row.indicator==="participation");
+    const sexes = [t("女性","Women"), t("男性","Men")];
+    const participation = figure("participation-markets",t("两地男女劳动参与率","Labour force participation by sex and market"),
+      t("2025 年 · 15 岁及以上 · 国际劳工组织模型估计","2025 · Ages 15 and over · Modelled ILO estimates"),
+      c.bars([["CN",cn],["HK",hk]].map(([area,name])=>({
+        name,values:["Women","Men"].map(sex=>participationRows.find(row=>row.area===area && row.nameEn===sex)?.value),
+      })),
+        {colors:[rose,purple],labels:sexes,max:100,format:percent,label:t("同口径比较两地男女劳动参与率","Comparable labour force participation rates by sex and market")}),
+      t("劳动参与率是同一性别人口中正在工作或处于失业状态的人所占的比例。两地采用相同的年龄下限和估计方法。",
+        "The rate is the share of each sex that is employed or unemployed. Both markets use the same age threshold and estimation method."),
+      {key:legend(sexes.map((name,i)=>[name,[rose,purple][i]])),full:true});
+    const wageKeys = ["wage_nonprivate","wage_private"];
+    const wageRows = data.filter(row=>wageKeys.includes(row.indicator));
+    const years = unique(wageRows.map(row=>+row.period)).sort((a,b)=>b-a);
+    const wageData = wageRows.filter(row=>+row.period===state.wageContextYear);
+    const sectors = [t("非私营单位","Non-private units"), t("私营单位","Private units")];
+    const mainlandPay = figure("income-mainland",t("内地城镇单位分行业年平均工资","Average annual wages in urban Mainland units by industry"),
+      yearLabel(state.wageContextYear)+t(" · 人民币元／年 · 税前"," · CNY per year · Before tax"),
+      c.bars([...by(wageData,"nameZh")].map(([,rows])=>({name:group(rows[0]),values:wageKeys.map(key=>rows.find(row=>row.indicator===key)?.value)})),
+        {labels:sectors,colors:[purple,rose],format:number,label:t("内地城镇单位工资按私营和非私营分类","Average wages for private and non-private urban units in Mainland China")}),
+      t("数据来自城镇地域内就业人数至少 5 人的法人单位。破折号表示该类别未发布数值。两类单位分别统计。",
+        "The survey covers legal entities in urban areas with at least five workers. A dash indicates an unpublished figure. Private and non-private units are reported separately."),
+      {full:true,key:legend(sectors.map((name,i)=>[name,[purple,rose][i]])),control:select("wageContextYear",t("内地工资年份","Mainland wage year"),years)});
+    return `<section aria-labelledby="risk-heading"><header class="subhead"><h2 id="risk-heading">${t("年轻人找工作有多难？","How much pressure do younger job seekers face?")}</h2>
+      ${hint("每张图各自呈现当地总体与青年失业率。两地年龄范围、在校生处理和统计时段不同，图表各用当地刻度。","Each chart shows local overall and youth unemployment. Age bands, treatment of students and reference periods differ, so each chart uses its own scale.")}</header>`
+      + grid(unemployment("CN",t("全国城镇调查失业率","Urban China surveyed unemployment"),t("2025 年 12 月","December 2025"),
+        t("总体包含符合劳动力定义的在校生。两个青年组都剔除在校生。","The overall rate can include students in the labour force. Both youth rates exclude students."),purple,20),
+        unemployment("HK",t("香港失业率","Hong Kong unemployment"),t("2025 年第四季度","2025 Q4"),
+          t("全港总体及分年龄失业率均未经季节性调整。年龄组沿用综合住户统计调查。","Overall and age-group rates are not seasonally adjusted. Age bands follow the General Household Survey."),rose,15))
+      + appendix("risk-hk",t("查阅香港失业率历史、年龄及教育组","Explore Hong Kong unemployment history, age and education"),risk()) + `</section>
+      <section aria-labelledby="pay-context-heading"><header class="subhead"><h2 id="pay-context-heading">${t("谁在参与劳动市场？行业收入怎么看？","Who participates in the labour market, and what do industries pay?")}</h2></header>`
+      + grid(participation)
+      + appendix("market-wages",t("查阅两地各自的行业收入数据","Explore each market’s industry earnings"),
+        hint("内地是城镇单位年平均工资，香港是就业人士月收入中位数。各自按当地行业分类、调查范围和币种展示。",
+          "Mainland data are average annual wages from urban units. Hong Kong data are median monthly earnings from household surveys. Each uses its own industry categories, coverage and currency.")
+        + grid(mainlandPay) + equity()) + `</section>`;
   }
 
   function structure() {
@@ -168,7 +216,7 @@
     const taskGroups = new Set(rules.map(rule=>state.taskOccupations[rule.id]).filter(Boolean));
     return heading(pages[1],1) + profilePanel(rules)
       + appendix("structure-data",t("查阅香港行业与职业结构","Explore Hong Kong’s industries and occupations"),overview)
-      + vacancyPanel(taskGroups) + pairReview(false) + next(1);
+      + vacancyPanel(taskGroups) + pairReview();
   }
 
   function risk() {
@@ -235,9 +283,8 @@
         field==="participation"?`${sexNames[i]} · ${ageLabel(r.name)} · ${percent(r[field])}`: `${sexNames[i]} · ${yearLabel(r.year)} · ${money(r[field])}`
       ]).sort((a,b)=>a[0]-b[0]),palette[i],i===0));
     const female=getOverall("Female"), male=getOverall("Male");
-    const referenceGroups = new Set(state.pairs.map(pair => pathway.equityIndustry[pair.id]));
     const industry=[...by(bands,"name")].map(([name,rs])=>({
-      name:label(name), highlighted:referenceGroups.has(name), values:sexes.map(s=>rs.find(r=>r.sex===s)?.pay),
+      name:label(name), values:sexes.map(s=>rs.find(r=>r.sex===s)?.pay),
     }));
     const ageNames=unique(ages.map(r=>r.name)).sort((a,b)=>a.localeCompare(b,"zh-HK",{numeric:true}));
     const ageTicks=ageNames.map((_,i)=>i).filter(i=>i%2===0);
@@ -248,8 +295,8 @@
     return earningsStats + grid(
         figure("income-industry",t("行业月收入中位数","Median monthly earnings by industry"),yearLabel(year)+t(" · 港元／月"," · HKD per month"),
           c.bars(industry,{labels:sexNames,colors:palette,max:Math.max(35000,...industry.flatMap(r=>r.values).filter(Number.isFinite)),format:number,label:t("同年各行业男女月收入中位数对照","Grouped bars comparing women’s and men’s median earnings by industry")}),
-          t("高亮行是已选方向所属的收入大类。一行可能覆盖多个招聘行业。职业、年资、全职比例与工时都会影响群体中位数。",
-            "Highlighted rows are broad earnings categories that cover your picks. A row may include several hiring industries. Occupation, seniority, full-time share and hours can all affect the group medians."),
+          t("各行业的职业、年资、全职比例与工时都会影响群体中位数。图上的差距描述两个就业群体的总体收入。",
+            "Occupation, seniority, full-time share and hours affect each group’s median. The bars describe earnings across each group of employed people."),
           {key:keys,full:true}))
       + appendix("equity-data",t("继续看总体月收入和劳动参与率","Explore overall earnings and labour force participation"),
       grid(
@@ -367,41 +414,26 @@
       </div></section>`;
   }
 
-  function pairReview(reviewing) {
+  function pairReview() {
     const pairs = state.pairs;
-    const reviewed = pairs.filter(pair=>pair.kept).length;
-    const title = reviewing ? t("确认带入预算的方向","Confirm options for the budget") : t("待查清单","Options to review");
+    const title = t("确认带入预算的方向","Choose options to test in your budget");
     return `<section class="card pair-review" aria-labelledby="pairs-heading"><h2 id="pairs-heading">${title}</h2>
-      <p class="mode-note">${t(`已选 ${pairs.length} 项 · 已确认 ${reviewed} 项`,`${pairs.length} selected · ${reviewed} confirmed`)}</p>
+      <p class="mode-note">${t(`已选 ${pairs.length} 个方向`,`${pairs.length} options selected`)}</p>
       ${pairs.length ? `<ul class="pair-list">${pairs.map(pair=>{
         const key = keyOf(pair);
         const evidence = pathway.findVacancy(pair.id,pair.occupation);
-        const category = pathway.equityIndustry[pair.id];
         return `<li><div><strong>${esc(pairTitle(pair))}</strong>
           <p>${number(evidence.count)} ${t("个职业组空缺","occupation vacancies")} · ${vacancyShare(evidence)} ${t("占行业空缺","of industry vacancies")}</p>
-          <p>${esc(insight(pair))}</p>
-          ${reviewing&&category ? `<p>${t("可参考的收入大类","Broad earnings reference")} · ${esc(label(category))}</p>` : ""}</div>
-          <div class="chip-row">${reviewing ? chip("keepPair",key,pair.kept?t("已确认保留","Confirmed"):t("保留作比较","Keep for comparison"),pair.kept) : ""}
-            ${chip("removePair",key,t("移出清单","Remove"))}</div>
-          ${reviewing ? `<label class="field pair-note">${t("下一步核查的问题","Question to verify")}
+          <p>${esc(insight(pair))}</p></div>
+          <div class="chip-row">${chip("removePair",key,t("移出清单","Remove"))}</div>
+          <label class="field pair-note">${t("面试时我想问什么（选填）","What I want to ask at an interview (optional)")}
             <input type="text" data-note="${esc(key)}" maxlength="180" value="${esc(pair.note)}"
-              placeholder="${t("例如岗位实际工时是多少？","For example, what are the actual working hours?")}"></label>` : ""}
+              placeholder="${t("例如岗位实际工时是多少？","For example, what are the actual working hours?")}"></label>
         </li>`;
       }).join("")}</ul>` : empty(t("选一个行业和职业组，就能在这里继续。","Choose an industry and occupation pair to continue."))}
-      ${reviewing&&pairs.length ? `<div class="chapter-actions">
-        ${chip("finishReview","all",t("确认清单并开始试算","Confirm list and test my criteria"))}</div>` : ""}
+      ${pairs.length ? `<div class="chapter-actions">
+        ${chip("finishReview","all",t("用所选方向试算工资、工时和生活费","Test pay, hours and living costs for these options"))}</div>` : ""}
       </section>`;
-  }
-
-  function review() {
-    return heading(pages[2],2)
-      + `<div class="decision"><strong>${t("正在复核的方向","Options under review")}</strong>
-        <p>${state.pairs.length ? esc(list(state.pairs.map(pairTitle))) : t("可先看整体数据，再回到 01 页加入方向。","Explore the overall figures, then return to chapter 01 to add options.")}</p>
-        <div class="chapter-actions"><a class="secondary-link" href="#structure">${t("编辑探索方向","Edit my options")}</a>
-          ${state.pairs.length ? `<a class="secondary-link" href="#pairs-heading" data-scroll="pairs-heading">${t("前往确认清单","Go to confirmation")}</a>` : ""}</div></div>`
-      + `<section aria-labelledby="risk-heading"><header class="subhead"><h2 id="risk-heading">${t("求职缓冲","Time for the job search")}</h2></header>${risk()}</section>
-        <section aria-labelledby="pay-context-heading"><header class="subhead"><h2 id="pay-context-heading">${t("薪酬参照","Earnings context")}</h2></header>${equity()}</section>`
-      + pairReview(true);
   }
 
   function candidate(row) {
@@ -492,12 +524,12 @@
   function fit() {
     const confirmed = state.pairs.filter(pair=>pair.kept);
     const editLink = `<a class="secondary-link" href="#structure">${t("返回调整行业与职业","Edit industries and occupations")}</a>`;
-    if (!confirmed.length) return heading(pages[3],3) + `<section class="card empty-state">
+    if (!confirmed.length) return heading(pages[2],2) + `<section class="card empty-state">
       <h2>${t("先确认要比较的方向","Confirm the options you want to compare")}</h2>
-      <p>${state.pairs.length ? t("你已有待查组合。请在 02 页复核后带进预算。","You have options waiting for review. Confirm them in chapter 02 before testing your budget.")
+      <p>${state.pairs.length ? t("你已经选了方向。回到 01 的清单，点试算按钮即可带入预算。","You have selected options. Return to the chapter 01 shortlist and use its button to start the calculation.")
         : t("可以从 01 页挑选方向，也可以直接载入嘉宁的完整示例。","Choose options in chapter 01, or load Jia Ning’s complete example.")}</p>
       <div class="chapter-actions">${editLink}
-        ${state.pairs.length ? `<a class="secondary-link" href="#review">${t("前往复核","Review my options")}</a>`
+        ${state.pairs.length ? `<a class="secondary-link" href="#shortlist">${t("返回已选清单","Return to my shortlist")}</a>`
           : chip("case","jia",t("载入嘉宁的演示方案","Load Jia Ning’s example"))}</div></section>`;
 
     const selectedIndustries = new Set(confirmed.map(pair=>pair.id));
@@ -536,15 +568,16 @@
     const tags = [profile.major,profile.minor].map(key=>pathway.nameOf(pathway.majors,key)).filter(Boolean)
       .concat(profile.interests.map(key=>pathway.nameOf(pathway.interests,key)),
         profile.skills.map(key=>pathway.nameOf(pathway.skills,key)));
-    return heading(pages[3],3) + stats(
+    return heading(pages[2],2) + stats(
       [confirmed.length,t("已确认的行业与职业组合","Confirmed industry and occupation pairs")],
       [matched.length,t("至少一个细分行业满足三项条件","At least one segment meets all three criteria")],
       [money(budget),t("按当前 Offer 估算的月结余","Monthly surplus with the current offer")])
       + `<div class="decision" aria-live="polite"><strong>${esc(status)}</strong>
+        ${state.pairs.length>confirmed.length ? `<p>${t("有新选方向待带入试算。可以回清单确认。","New options are ready to add. Confirm them from the shortlist.")}</p>` : ""}
         ${tags.length ? `<p>${t("个人线索","My profile")} · ${esc(list(tags))}</p>` : ""}
         ${profile.keywords ? `<p>${t("自定义求职搜索词","My job-ad keywords")} · ${esc(profile.keywords)}</p>` : ""}
         <div class="chapter-actions">${editLink}
-          <a class="secondary-link" href="#review">${t("重新复核清单","Review shortlist")}</a>
+          <a class="secondary-link" href="#shortlist">${t("返回已选清单","Return to my shortlist")}</a>
           <a class="secondary-link" href="#shortlist-heading" data-scroll="shortlist-heading">${t("跳至候选表","Jump to shortlist")}</a></div></div>`
       + `<section aria-labelledby="conditions-heading"><header class="subhead"><h2 id="conditions-heading">${t("待遇能否支撑留港？","Would the pay and hours work for me?")}</h2></header>`
       + `<form class="control-bar" data-budget-form>${select("payYear",t("工资参考年","Pay reference year"),span(2016,2025).reverse())}
@@ -589,19 +622,25 @@
     const census = (url,zh,en)=>`<a href="https://www.stats.gov.cn/sj/pcsj/rkpc/${url}">${t(zh,en)}</a>`;
     const hk = (code,zh,en)=>`<a href="https://www.censtatd.gov.hk/en/web_table.html?id=${code}">${code} · ${t(zh,en)}</a>`;
     return `<header class="chapter-header"><h1>${t("数据来源与统计口径","Data and methods")}</h1>
-    <p>${t("图表由项目整合 Excel 中的 Tableau 提取数据生成。各章按其调查范围和观察期展示。",
-      "The charts use Tableau extracts from the project’s consolidated workbook. Each chapter follows the source survey’s coverage and reference period.")}</p></header>
+    <p>${t("图表来自整合工作簿中的原项目数据及新增官方数据。两地数据按各自调查范围和观察期展示。",
+      "Charts use the original project extracts and new official figures in the consolidated workbook. Figures follow the coverage and period of their source surveys.")}</p></header>
     <section class="card source-card">
       <h3>${t("两地对照","Two markets")}</h3>
       <ul><li>${census("5rp/html/l0404.htm","内地 2010 年人口普查","Mainland China 2010 Census")} ·
       ${census("6rp/html/B0402a.htm","内地 2020 年人口普查","Mainland China 2020 Census")}${t("。各行业 35 岁及以上占比由原项目的 35 岁以下占比取补数，沿用原有行业分类、时点和估计。",
         ". Shares aged 35 and over are complements of the original under-35 shares. They use the original project’s industry groupings, reference years and estimates.")}</li>
       <li>${hk("210-06201","香港政府统计处劳动人口表","Hong Kong C&SD labour force table")}${t("提供劳动人口背景。两地行业、年龄定义及年份见整合 Excel 的「00_口径限制」。",
-        " provides labour force context. See the consolidated workbook’s 00 methods sheet for definitions and reference years.")}</li></ul>
+        " provides labour force context. See the consolidated workbook’s 00 methods sheet for definitions and reference years.")}</li>
+      <li><a href="https://www.stats.gov.cn/sj/xwfbh/fbhwd/202601/t20260119_1962330.html">${t("国家统计局 · 2025 年就业形势","National Bureau of Statistics · 2025 employment conditions")}</a> ·
+        <a href="https://data.stats.gov.cn/easyquery.htm?cn=A01">${t("国家数据 · 月度分年龄失业率","National Data · Monthly unemployment by age")}</a> ·
+        ${hk("210-06401","香港分年龄失业率","Hong Kong unemployment by age")}${t("。内地为 2025 年 12 月，香港为第四季度、未经季调。",". Mainland figures refer to December 2025. Hong Kong figures refer to Q4, unadjusted.")}</li>
+      <li><a href="https://genderdata.worldbank.org/en/economies/china">${t("世界银行 · 内地劳动参与率","World Bank · Mainland participation")}</a> ·
+        <a href="https://genderdata.worldbank.org/en/economies/hong-kong-sar-china">${t("世界银行 · 香港劳动参与率","World Bank · Hong Kong participation")}</a>${t("。2025 年男女数据均为 ILO 15 岁及以上模型估计。",". The 2025 figures are ILO modelled estimates for ages 15 and above, by sex.")}</li>
+      <li><a href="https://www.stats.gov.cn/sj/zxfbhjd/202605/t20260515_1963707.html">${t("国家统计局 · 城镇单位就业人员年平均工资（表 2、5）","National Bureau of Statistics · Average annual wages of workers in urban units (Tables 2 and 5)")}</a>${t("。原值、定义、出处及可比性收录在整合工作簿的「00_新增官方数据」「00_指标可比性」。",". Original figures, definitions, sources and comparability notes are in the consolidated workbook.")}</li></ul>
       <h3>${t("香港就业、失业与收入","Hong Kong employment, unemployment and earnings")}</h3>
       <ul><li>${t("就业规模和构成来自整合 Excel 的 <code>01_01</code>、<code>01_02</code> 工作表。失业率、年龄和教育数据来自 <code>04_05</code>。",
         "Employment levels and breakdowns come from sheets <code>01_01</code> and <code>01_02</code>. Unemployment, age and education data come from <code>04_05</code>.")}</li>
-      <li>${t("性别页来自 <code>03_04</code>。参考统计处","The gender chapter uses sheet <code>03_04</code>. Reference tables")}
+      <li>${t("香港分性别收入和参与率来自 <code>03_04</code>。参考统计处","Hong Kong earnings and participation by sex use sheet <code>03_04</code>. Reference tables")}
         ${hk("210-06201","劳动参与","Participation")} · ${hk("210-06316","行业月入","Monthly earnings by industry")}${t("。网站保留名义收入及各数据集的调查定义。",
         ". Earnings are nominal. The source survey definitions apply.")}</li></ul>
       <h3>${t("求职方向探索","Job options")}</h3>
@@ -626,7 +665,7 @@
       <${tag}>${page.question}</${tag}><p>${page.summary}</p></header>`;
   }
 
-  const renderPage = {markets,structure,review,fit,sources};
+  const renderPage = {markets,structure,fit,sources};
 
   function renderInterface() {
     const title = t("香港就业市场探索器","Hong Kong Graduate Career Explorer");
@@ -685,11 +724,18 @@
   function route() {
     const id=location.hash.slice(1);
     if(id==="content") { main.focus(); return; }
-    const match=id==="risk" || id==="equity" ? "review" : Object.hasOwn(renderPage,id) ? id : "markets";
-    if(match===chapter) return;
+    const anchors = new Map([
+      ["shortlist",["structure","pairs-heading"]], ["review",["structure","pairs-heading"]],
+      ["risk",["markets","risk-heading"]], ["equity",["markets","pay-context-heading"]],
+    ]);
+    const anchor = anchors.get(id);
+    const match=anchor?.[0] ?? (Object.hasOwn(renderPage,id) ? id : "markets");
+    if(match===chapter && !anchor) return;
     chapter=match;
     render();
-    window.scrollTo(0,0);
+    const target = anchor && $(anchor[1]);
+    if(target) target.scrollIntoView({block:"start"});
+    else window.scrollTo(0,0);
     main.focus({preventScroll:true});
   }
 
@@ -756,10 +802,6 @@
       if(!state.pairs.some(pair=>keyOf(pair)===value) && pathway.findVacancy(id,occupation)) {
         state.pairs.push({id,occupation,kept:false,note:""});
       }
-    }
-    if(key==="keepPair") {
-      const pair=state.pairs.find(pair=>keyOf(pair)===value);
-      if(pair) pair.kept=!pair.kept;
     }
     if(key==="removePair") state.pairs=state.pairs.filter(pair=>keyOf(pair)!==value);
     if(key==="finishReview") {
