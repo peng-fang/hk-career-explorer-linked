@@ -26,6 +26,7 @@
   ];
   const defaultWageRate = 1.0828;
   const wageRateSource = "https://www.censtatd.gov.hk/en/data/stat_report/product/B1010003/att/B10100032025AN25B0100.pdf";
+  const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,...saved} = pathway.load();
   const state = {
     marketPeriod:"latest", overviewYear:2025, riskYear:2025, age:"20 - 24", equityYear:2025, education:"all",
     marketRegion:"", overviewIndustry:null, participationMode:"year", participationFocus:"",
@@ -33,8 +34,8 @@
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
-    fitBroad:[], fitDetails:[], fitCell:"", fitVacancyMode:"count", fitOccupations:"all",
-    ...pathway.load(),
+    industryDetails:[], budgetScope:true,
+    ...saved,
   };
   let participationTimer;
   const aliases = {
@@ -461,15 +462,11 @@
       </section>`;
   }
 
-  function vacancyPanel(taskGroups, inFit = false) {
-    const picked = inFit ? fitVisibleIndustries() : state.selected;
-    const modeKey = inFit ? "fitVacancyMode" : "vacancyMode";
-    const occupationKey = inFit ? "fitOccupations" : "occupations";
-    const mode = state[modeKey];
-    const cell = inFit ? state.fitCell : state.vacancyCell;
-    const cellAction = inFit ? "fitVacancyCell" : "vacancyCell";
+  function vacancyPanel(taskGroups) {
+    const picked = visibleIndustries();
+    const {vacancyMode:mode,vacancyCell:cell,occupations} = state;
     const chosen = d.demand.filter(r=>!picked.length||picked.includes(r.id));
-    const scope = state[occupationKey]==="tasks" && !taskGroups.size ? "all" : state[occupationKey];
+    const scope = occupations==="tasks" && !taskGroups.size ? "all" : occupations;
     const groups = pathway.occupationGroups.filter(name =>
       scope==="all" || scope===name || (scope==="tasks" && taskGroups.has(name)));
     const occupationScopes = taskGroups.size ? ["tasks","all",...pathway.occupationGroups] : ["all",...pathway.occupationGroups];
@@ -481,7 +478,7 @@
       (v,occupation,industry)=>{
         const key = pathway.pairKey(industry.id,occupation.key);
         return {text:isCount?number(v):percent(v*100),opacity:.12+.66*Math.sqrt(v/(isCount?maxCount:1)),
-          action:cellAction,key,selected:key===cell};
+          action:"vacancyCell",key,selected:key===cell};
       },
       t("职业组","Occupation"),t("行业职业空缺热力图","Vacancy heatmap by industry and occupation"));
     const [activeId,activeGroup] = cell.split("|");
@@ -491,35 +488,29 @@
     const alreadyAdded = state.pairs.some(pair=>keyOf(pair)===cell);
     return `<section aria-labelledby="find-heading" id="hiring">
       <header class="subhead"><h2 id="find-heading">${t("哪里在招聘？","Where are the vacancies?")}</h2></header>
-      ${controls(inFit ? fitFilters() : `<label class="field">${t("单选行业","Select one industry")}<select id="industry" data-control="industry">
-        <option value="all"${!picked.length?" selected":""}>${t("全部行业","All industries")}</option>
-        ${picked.length>1?`<option value="multiple" selected disabled>${t("已多选行业","Multiple industries selected")}</option>`:""}
-        ${d.demand.map(x=>`<option value="${x.id}"${picked.length===1&&picked[0]===x.id?" selected":""}>${esc(label(x.name))}</option>`).join("")}</select></label>`,
-      select(occupationKey,t("职业组","Occupation group"),occupationScopes,v=>{
+      ${controls(industryFilters(),select("occupations",t("职业组","Occupation group"),occupationScopes,v=>{
         if(v==="tasks") return t("任务卡所选职业组","Groups selected on task cards");
         return v==="all"?t("全部职业","All occupations"):label(v);
-      },scope),
-      inFit ? "" : `<div class="chip-row" role="group" aria-label="${t("多选行业","Select multiple industries")}">${d.demand.map(x=>chip("toggleIndustry",x.id,label(x.name),picked.includes(x.id))).join("")}</div>`)}
+      },scope))}
+      ${hint("招聘空缺按行业大类统计。选择细分行业会突出所属大类，并把细分范围带到 02 页试算。",
+        "Vacancies are reported by broad industry. Selecting a detailed industry focuses its parent group and carries the detailed selection into chapter 02.")}
       ${grid(
         figure("map",t("招聘机会地图","Hiring opportunities"),t("2026Q2 · 横轴空缺率 · 纵轴用工同比","2026 Q2 · Vacancy rate (x) · Employment change year on year (y)"),
-          viz("map-bubbles",w=>c.bubbles(w,d.demand.map(r=>({...r,name:label(r.name)})),picked,inFit?"fitBubble":"bubble")),
-          (inFit ? t("点气泡会同步筛选热力表、工资、工时、用工走势与已确认候选。Ctrl／⌘ 可多选。",
-            "Select a bubble to filter vacancies, pay, hours, employment trends and confirmed options. Ctrl/Cmd-click toggles additional industries.")
-            : t("圆面积表示空缺人数。横虚线表示用工同比 0%，竖虚线表示调查总体空缺率 1.7%。点气泡会筛选热力表，Ctrl／⌘ 可多选。",
-            "Bubble area shows vacancy count. The horizontal line marks zero growth. The vertical line marks the survey-wide vacancy rate of 1.7%. Select a bubble to filter the heatmap. Ctrl/Cmd-click adds industries.")),
+          viz("map-bubbles",w=>c.bubbles(w,d.demand.map(r=>({...r,name:label(r.name)})),picked)),
+          t("圆面积表示空缺人数。横虚线表示用工同比 0%，竖虚线表示调查总体空缺率 1.7%。点气泡筛选热力表，Ctrl／⌘ 可多选。",
+            "Bubble area shows vacancy count. The horizontal line marks zero growth. The vertical line marks the survey-wide vacancy rate of 1.7%. Select a bubble to filter the heatmap. Ctrl/Cmd-click toggles additional industries."),
           {key:legend([[t("用工增加","Employment up"),purple],[t("用工减少","Employment down"),rose]])}),
         figure("vacancies",t("行业 × 职业空缺","Vacancies by industry and occupation"),t("2026Q2 · 行业大类与九个职业组","2026 Q2 · Broad industries and nine occupation groups"),
-          heat,inFit ? t("点格子按所属行业筛选，同时查看该职业组空缺。工资和工时是行业数据。","Select a cell to filter by industry and inspect the occupation’s vacancies. Pay and hours are reported by industry.")
-            : t("点格子查看本职业组的空缺数和行业内占比，再把这个组合加入比较。",
-            "Select a cell to see the occupation’s vacancy count and share within its industry. You can then add the pair to your comparison."),
-          {control:select(modeKey,t("单元格显示","Show in cells"),["count","share"],v=>v==="count"?t("空缺人数","Vacancy count"):t("行业内占比","Share within industry"))}))}
+          heat,t("点格子查看职业组的空缺数和行业内占比，再把这个组合加入比较，或单独筛选该行业。",
+            "Select a cell to see the occupation’s vacancy count and share. You can then add the pair to your comparison or filter to its industry."),
+          {control:select("vacancyMode",t("单元格显示","Show in cells"),["count","share"],v=>v==="count"?t("空缺人数","Vacancy count"):t("行业内占比","Share within industry"))}))}
       <div class="decision evidence" aria-live="polite">
         ${active && market ? `<strong>${esc(pairTitle({id:activeId,occupation:activeGroup}))}</strong>
           <p>${number(active.count)} ${t("个职业组空缺","vacancies in this occupation group")} · ${vacancyShare(active)}
             ${t("占该行业全部空缺","of all vacancies in this industry")} · ${t("行业空缺率","Industry vacancy rate")} ${percent(market.rate*100)} · ${market.period}</p>
-          ${alreadyAdded ? `<p class="good">${t("已加入比较","In your comparison")}</p>` : `<div class="chip-row">
-            ${inFit ? chip("inspectFitPair",cell,t("到 01 页加入比较","Add from chapter 01"))
-              : chip("addPair",cell,t("加入比较","Add to comparison"))}</div>`}`
+          <div class="chip-row">
+            ${alreadyAdded ? `<span class="good">${t("已加入比较","In your comparison")}</span>` : chip("addPair",cell,t("加入比较","Add to comparison"))}
+            ${picked.length===1 ? "" : chip("focusIndustry",activeId,t("筛选此行业","Filter to this industry"))}</div>`
           : `<p>${t("点一个热力格查看招聘证据。","Select a heatmap cell to inspect the hiring evidence.")}</p>`}
       </div></section>`;
   }
@@ -631,51 +622,53 @@
       }).join("")}</tbody></table></div>`;
   }
 
-  const fitSegments = () => d.pay.filter(r=>r.year===state.payYear
-    && (!state.fitBroad.length || state.fitBroad.includes(r.id)));
-  const fitVisibleIndustries = () => state.fitDetails.length
-    ? unique(fitSegments().filter(r=>state.fitDetails.includes(r.name)).map(r=>r.id))
-    : state.fitBroad;
-  const fitIsFiltered = () => state.fitBroad.length>0 || state.fitDetails.length>0;
+  const industrySegments = [...new Map(d.pay.map(({name,id})=>[name,{name,id}])).values()];
+  const segmentsFor = ids => industrySegments.filter(row=>!ids.length||ids.includes(row.id));
+  const visibleIndustries = () => state.industryDetails.length
+    ? unique(segmentsFor(state.selected).filter(r=>state.industryDetails.includes(r.name)).map(r=>r.id))
+    : state.selected;
+  const hasIndustryFilter = () => state.selected.length>0 || state.industryDetails.length>0;
 
-  function setFitBroad(ids) {
-    state.fitBroad=ids;
-    const allowed = new Set(fitSegments().map(row=>row.name));
-    state.fitDetails=state.fitDetails.filter(name=>allowed.has(name));
+  function setIndustryFilter(ids, details = state.industryDetails) {
+    state.selected=ids;
+    const allowed = new Set(segmentsFor(ids).map(row=>row.name));
+    state.industryDetails=details.filter(name=>allowed.has(name));
+    state.budgetScope=true;
   }
 
-  function fitFilters() {
-    const detailed = fitSegments().map(row=>[row.name,label(row.name)]);
+  function industryFilters() {
+    const detailed = segmentsFor(state.selected).map(row=>[row.name,label(row.name)]);
     const broad = d.demand.map(row=>[row.id,label(row.name)]);
-    const visible = fitVisibleIndustries();
+    const visible = visibleIndustries();
     const menu = (key,title,options) => {
       const selected = state[key];
       const summary = selected.length?t(`已选 ${selected.length} 项`,`${selected.length} selected`):t("全部","All");
       return `<details class="filter-menu" id="${key}-menu" data-persist-open><summary>${title} · ${summary}</summary>
         <div class="filter-panel"><div class="chip-row">
-          ${chip("setFitFilter",key+"|all",t("全选","Select all"))}
-          ${chip("setFitFilter",key+"|clear",t("清除筛选","Clear filter"))}
+          ${chip("setIndustryFilter",key+"|all",t("全选","Select all"))}
+          ${chip("setIndustryFilter",key+"|clear",t("清除筛选","Clear filter"))}
         </div><fieldset aria-label="${title}">${options.map(([id,name])=>`<label>
-          <input type="checkbox" data-fit-filter="${key}" data-focus="${esc(key+":"+id)}" value="${esc(id)}"${selected.includes(id)?" checked":""}>
+          <input type="checkbox" data-industry-filter="${key}" data-focus="${esc(key+":"+id)}" value="${esc(id)}"${selected.includes(id)?" checked":""}>
           <span>${esc(name)}</span></label>`).join("")}</fieldset></div></details>`;
     };
-    return select("fitSingle",t("单选行业","Select one industry"),
+    return select("hiringIndustry",t("单选行业","Select one industry"),
       visible.length>1?["all","multiple",...broad.map(([id])=>id)]:["all",...broad.map(([id])=>id)],
       id=>id==="all"?t("全部行业","All industries"):id==="multiple"?t("已多选行业","Multiple industries selected"):industryName(id),
       visible.length>1?"multiple":visible[0]??"all")
-      + menu("fitBroad",t("行业大类","Broad industry"),broad)
-      + menu("fitDetails",t("细分行业","Detailed industry"),detailed)
-      + (fitIsFiltered()?chip("resetFitFilters","all",t("恢复全部行业","Show all industries")):"");
+      + menu("selected",t("行业大类","Broad industry"),broad)
+      + menu("industryDetails",t("细分行业","Detailed industry"),detailed)
+      + (hasIndustryFilter()?chip("resetIndustryFilters","all",t("恢复全部行业","Show all industries")):"");
   }
 
   function fit() {
     const confirmed = state.pairs.filter(pair=>pair.kept);
-    const editLink = `<a class="secondary-link" href="#structure">${t("返回调整行业与职业","Edit industries and occupations")}</a>`;
+    const editLink = `<a class="secondary-link" href="#hiring">${t("返回 01 调整招聘筛选","Edit hiring filters in chapter 01")}</a>`;
     const selectedIndustries = new Set(confirmed.map(pair=>pair.id));
-    const filtered = fitIsFiltered();
-    const visible = fitVisibleIndustries();
+    const filtered = hasIndustryFilter() && state.budgetScope;
+    const visible = visibleIndustries();
     const chosen = d.demand.filter(r=>filtered?visible.includes(r.id):!confirmed.length||selectedIndustries.has(r.id));
-    const referenceRows = fitSegments().filter(r=>!state.fitDetails.length||state.fitDetails.includes(r.name));
+    const referenceRows = d.pay.filter(r=>r.year===state.payYear && (!filtered ||
+      visible.includes(r.id) && (!state.industryDetails.length || state.industryDetails.includes(r.name))));
     const rows = referenceRows.filter(r=>selectedIndustries.has(r.id)).map(candidate);
     const options = confirmed.filter(pair=>!filtered||visible.includes(pair.id)).map(pair=>{
       const vacancy = pathway.findVacancy(pair.id,pair.occupation);
@@ -711,26 +704,33 @@
     const tags = [profile.major,profile.minor].map(key=>pathway.nameOf(pathway.majors,key)).filter(Boolean)
       .concat(profile.interests.map(key=>pathway.nameOf(pathway.interests,key)),
         profile.skills.map(key=>pathway.nameOf(pathway.skills,key)));
+    const filterNames = list(state.industryDetails.length ? state.industryDetails.map(label) : visible.map(industryName));
     return heading(pages[2],2) + stats(
       [ranked.length,t("当前视图中的已确认方向","Confirmed options in view")],
       [matched.length,t("至少一个细分行业满足三项条件","At least one segment meets all three criteria")],
       [money(budget),t("按当前 Offer 估算的月结余","Monthly surplus with the current offer")])
       + `<div class="decision" aria-live="polite"><strong>${esc(status)}</strong>
+        ${hasIndustryFilter() ? `<p>${filtered
+          ? `${t("沿用 01 页行业筛选","Using chapter 01 industry filters")} · ${esc(filterNames)}`
+          : t("当前展示全部行业参考和已确认方向。","Showing all industry references and confirmed options.")}</p>
+          ${filtered && confirmed.length>ranked.length ? `<p>${t(`已确认 ${confirmed.length} 个方向，当前筛选显示 ${ranked.length} 个。`,
+            `${ranked.length} of ${confirmed.length} confirmed options are in view.`)}</p>` : ""}` : ""}
         ${state.pairs.length>confirmed.length ? `<p>${t("有新选方向待带入试算。可以回清单确认。","New options are ready to add. Confirm them from the shortlist.")}</p>` : ""}
         ${tags.length ? `<p>${t("个人线索","My profile")} · ${esc(list(tags))}</p>` : ""}
         ${profile.keywords ? `<p>${t("自定义求职搜索词","My job-ad keywords")} · ${esc(profile.keywords)}</p>` : ""}
         <div class="chapter-actions">${editLink}
+          ${hasIndustryFilter() ? chip("budgetScope","toggle",filtered?t("显示全部行业与候选","Show all industries and options")
+            :t("应用 01 页筛选","Apply chapter 01 filters")) : ""}
           <a class="secondary-link" href="#shortlist">${t("返回已选清单","Return to my shortlist")}</a>
           <a class="secondary-link" href="#shortlist-heading" data-scroll="shortlist-heading">${t("跳至候选表","Jump to shortlist")}</a>
           ${confirmed.length?"":chip("case","jia",t("载入嘉宁的演示方案","Load Jia Ning’s example"))}</div></div>`
-      + vacancyPanel(new Set(),true)
       + `<section aria-labelledby="conditions-heading"><header class="subhead"><h2 id="conditions-heading">${t("待遇能否支撑留港？","Would the pay and hours work for me?")}</h2></header>`
       + `<form class="control-bar" data-budget-form>${select("payYear",t("工资参考年","Pay reference year"),span(2016,2025).reverse())}
         ${budgetField("targetPay",t("期望月薪（港元）","Target monthly pay (HKD)"),1)}${budgetField("maxHours",t("期望每周工时上限","Weekly hours limit"),.1)}
         ${budgetField("targetSurplus",t("期望月结余（港元）","Target monthly surplus (HKD)"),1)}
         <button class="chip apply-budget" type="submit" id="apply-targets">${t("更新目标","Apply criteria")}</button></form>`
-      + hint(`两图当前展示 ${referenceRows.length} 个调查细分行业，${rows.length} 个高亮细分行业属于已确认方向。可在上方调整行业筛选。`,
-        `Both charts show ${referenceRows.length} surveyed industry segments. The ${rows.length} highlighted segments cover confirmed options. Use the industry filters above to change the view.`)
+      + hint(`两图当前展示 ${referenceRows.length} 个调查细分行业，${rows.length} 个高亮细分行业属于已确认方向。`,
+        `Both charts show ${referenceRows.length} surveyed industry segments. The ${rows.length} highlighted segments cover confirmed options.`)
       + grid(
         figure("pay-range",t("月薪分位区间","Monthly pay range"),t(`${state.payYear} 年 5–6 月 · 全职雇员 · 港元／月`,`May–June ${state.payYear} · Full-time employees · HKD/month`),
           intervals(referenceRows,"pay",selectedIndustries),t("浅紫线段是第 25 至 75 百分位，保留行业中间一半的范围；圆点是中位数。点圆点可将该行业月薪带入预算。",
@@ -961,33 +961,17 @@
     }
     if(key==="riskAge") state.age=value;
     if(key==="educationGroup") state.education=state.education===value?"all":value;
-    if(key==="bubble" || key==="toggleIndustry") {
-      state.selected=toggleIndustry(state.selected,value,key==="toggleIndustry"||e.ctrlKey||e.metaKey);
+    if(key==="bubble") {
+      setIndustryFilter(toggleIndustry(visibleIndustries(),value,e.ctrlKey||e.metaKey),[]);
     }
-    if(key==="fitBubble") setFitBroad(toggleIndustry(fitVisibleIndustries(),value,e.ctrlKey||e.metaKey));
-    if(key==="fitVacancyCell") {
-      const id=value.split("|")[0];
-      setFitBroad(e.ctrlKey||e.metaKey?toggleIndustry(fitVisibleIndustries(),id,true):[id]);
-      state.fitCell=value;
-    }
-    if(key==="inspectFitPair") {
-      const [id,occupation] = value.split("|");
-      state.selected=[id];
-      state.occupations=occupation;
-      state.vacancyCell=value;
-      location.hash="hiring";
-      return;
-    }
-    if(key==="setFitFilter") {
+    if(key==="focusIndustry") setIndustryFilter([value]);
+    if(key==="setIndustryFilter") {
       const [filter,mode] = value.split("|");
-      if(filter==="fitBroad") setFitBroad(mode==="all"?d.demand.map(r=>r.id):[]);
-      else state.fitDetails=mode==="all"?fitSegments().map(r=>r.name):[];
+      if(filter==="selected") setIndustryFilter(mode==="all"?d.demand.map(r=>r.id):[]);
+      else setIndustryFilter(state.selected,mode==="all"?segmentsFor(state.selected).map(r=>r.name):[]);
     }
-    if(key==="resetFitFilters") {
-      setFitBroad([]);
-      state.fitDetails=[];
-      state.fitCell="";
-    }
+    if(key==="resetIndustryFilters") setIndustryFilter([],[]);
+    if(key==="budgetScope") state.budgetScope=!state.budgetScope;
     if(key==="offerMedian") state.offer=+value;
     if(key==="profileExample") loadExampleProfile();
     if(key==="clearProfile") {
@@ -1022,9 +1006,7 @@
     if(key==="removePair") state.pairs=state.pairs.filter(pair=>keyOf(pair)!==value);
     if(key==="finishReview") {
       for(const pair of state.pairs) pair.kept=true;
-      state.fitBroad=[];
-      state.fitDetails=[];
-      state.fitCell="";
+      state.budgetScope=true;
       pathway.save(state);
       location.hash="fit";
       return;
@@ -1033,11 +1015,12 @@
       loadExampleProfile();
       Object.assign(state,{
         pairs:pathway.examplePairs(true),selected:[],payYear:2025,startYear:2016,vacancyMode:"count",
-        fitBroad:[],fitDetails:[],fitCell:"",fitVacancyMode:"count",fitOccupations:"all",
+        industryDetails:[],budgetScope:true,vacancyCell:"",
         targetPay:25000,maxHours:42,targetSurplus:6000,offer:25000,rent:10000,living:6500,deduct:2000,
       });
     }
     const focusKey = key==="addPair" ? "vacancyCell:"+value
+      : key==="focusIndustry" ? "vacancyCell:"+state.vacancyCell
       : key==="overviewBand" ? "overviewIndustry:industry:"+value.split("|")[0] : el.dataset.focus;
     render(focusKey);
     if(key==="occupationGroup") $("hiring").scrollIntoView({block:"start"});
@@ -1069,11 +1052,11 @@
     if(e.key==="Escape") tooltip.hidden=true;
   });
   main.addEventListener("change",e=>{
-    if(e.target.dataset.fitFilter) {
-      const key=e.target.dataset.fitFilter;
+    if(e.target.dataset.industryFilter) {
+      const key=e.target.dataset.industryFilter;
       const next=toggleIndustry(state[key],e.target.value,true);
-      if(key==="fitBroad") setFitBroad(next);
-      else state.fitDetails=next;
+      if(key==="selected") setIndustryFilter(next);
+      else setIndustryFilter(state.selected,next);
       render(e.target.dataset.focus);
       return;
     }
@@ -1089,12 +1072,10 @@
     const key=e.target.dataset.control;
     if(!key || e.target.type==="number") return;
     if(key==="equityYear" || key==="participationMode") stopParticipation();
-    if(key==="fitSingle") {
+    if(key==="hiringIndustry") {
       if(e.target.value==="multiple") return;
-      state.fitDetails=[];
-      setFitBroad(e.target.value==="all"?[]:[e.target.value]);
+      setIndustryFilter(e.target.value==="all"?[]:[e.target.value],[]);
     }
-    else if(key==="industry") state.selected=e.target.value==="all"?[]:[e.target.value];
     else if(typeof state[key]==="number") {
       if(e.target.value==="") { e.target.value=state[key]; return; }
       const want=Number(e.target.value);
@@ -1158,6 +1139,15 @@
       render();
     }
   });
+  if (saved.industryDetails===undefined && (fitBroad?.length || fitDetails?.length)) {
+    const hadIndustryFilter = state.selected.length>0;
+    setIndustryFilter(hadIndustryFilter?state.selected:fitBroad??[],fitDetails??[]);
+    if(!hadIndustryFilter) {
+      state.vacancyCell ||= fitCell ?? "";
+      state.vacancyMode = fitVacancyMode ?? state.vacancyMode;
+      if(state.occupations==="all") state.occupations=fitOccupations ?? "all";
+    }
+  }
   renderInterface();
   route();
 })();

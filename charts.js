@@ -197,7 +197,7 @@
     }).join("")}</div>`;
   }
 
-  function bubbles(w, values, picked, action = "bubble") {
+  function bubbles(w, values, picked) {
     const h=254;
     const a=axes(w,h,{x:[.5,2.8],y:[-3,4],xTicks:[.5,1,1.5,2,2.5],yTicks:[-2,0,2,4],
       xFormat:percent,yFormat:percent,right:21,bottom:44});
@@ -208,7 +208,7 @@
     for(const r of values.slice().sort((a,b)=>b.openings-a.openings)) {
       const selected = picked.includes(r.id);
       const tip = `${r.name}\n${t("空缺率","Vacancy rate")} ${percent(r.rate*100)} · ${number(r.openings)}${t(" 个"," vacancies")}\n${t("用工同比","Employment YoY")} ${percent(r.yoy*100)}`;
-      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,action,r.id,selected)}/>`;
+      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,"bubble",r.id,selected)}/>`;
     }
     return svg(w,h,t("招聘机会地图，横轴职位空缺率，纵轴机构用工同比","Hiring opportunities. X: vacancy rate. Y: year-on-year employment change."),content);
   }
