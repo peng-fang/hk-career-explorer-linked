@@ -130,7 +130,8 @@
       + marketEvidence()
       + `<div class="decision"><strong>${t("嘉宁决定先查香港的岗位，同时保留内地投递。","Jia Ning decides to explore Hong Kong vacancies while keeping her Mainland search open.")}</strong>
         <div class="chapter-actions"><a class="hero-button" href="#structure" data-start-example>${t("跟随嘉宁找香港岗位","Explore Hong Kong vacancies with Jia Ning")}</a>
-        <a class="secondary-link" href="#structure">${t("用我的背景探索","Explore with my own background")}</a></div></div>`;
+        <button type="button" class="secondary-link" data-action="startOwn"${state.pairs.length ? ' aria-describedby="own-search-note"' : ""}>${t("用我的背景探索","Explore with my own background")}</button></div>
+        ${state.pairs.length ? `<p id="own-search-note">${t("从这里开始会清空已选方向和对应的面试备注。","Starting here clears your shortlist and its interview notes.")}</p>` : ""}</div>`;
   }
 
   function marketEvidence() {
@@ -779,6 +780,13 @@
   }
   function action(e,el) {
     const key=el.dataset.action, value=el.dataset.value;
+    if(key==="startOwn") {
+      state.pairs=[];
+      state.vacancyCell="";
+      pathway.save(state);
+      location.hash="structure";
+      return;
+    }
     if(key==="marketPeriod") state.marketPeriod=value;
     if(key==="resetWageRate") state.wageRate=defaultWageRate;
     if(key==="overviewYear") {

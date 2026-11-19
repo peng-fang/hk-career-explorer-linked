@@ -203,6 +203,7 @@ tbody td, tbody th { border-bottom: 1px solid #eee5e9; }
 .chapter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 17px; margin-top: 12px; }
 .chapter-actions .hero-button { margin: 0; }
 .secondary-link { color: var(--plum); font-weight: 700; text-underline-offset: 3px; text-decoration: underline; }
+button.secondary-link { padding: 0; border: 0; background: transparent; }
 .appendix { margin: 17px 0; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius); background: #fcf9f5; }
 .appendix > summary { font-weight: 750; color: var(--plum); }
 .appendix[open] > summary { margin-bottom: 13px; }
