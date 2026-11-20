@@ -28,21 +28,24 @@
   const defaultWageRate = 1.0828;
   const wageRateSource = "https://www.censtatd.gov.hk/en/data/stat_report/product/B1010003/att/B10100032025AN25B0100.pdf";
   const wageAgeGroups = {
-    finance:"金融地产商务", information:"信息通讯", construction:"建筑业", manufacturing:"制造业",
-    "land-transport":"运输仓储邮政", "real-estate":"金融地产商务", wholesale:"批发零售/进出口",
-    retail:"批发零售/进出口", accommodation:"住宿餐饮", food:"住宿餐饮",
+    finance:"金融地产商务", information:"运输及信息通讯", construction:"建筑业", manufacturing:"制造业",
+    "land-transport":"运输及信息通讯", "real-estate":"金融地产商务", wholesale:"批发零售住宿餐饮",
+    retail:"批发零售住宿餐饮", accommodation:"批发零售住宿餐饮", food:"批发零售住宿餐饮",
   };
-  const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,...saved} = pathway.load();
+  const formerAgeGroups = {"批发零售/进出口":"批发零售住宿餐饮","住宿餐饮":"批发零售住宿餐饮",
+    "运输仓储邮政":"运输及信息通讯","信息通讯":"运输及信息通讯","其他（农林采矿/公用事业/国际组织）":""};
+  const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,marketPeriod:formerIndustryPeriod,...saved} = pathway.load();
+  const savedWorkforcePeriod = saved.workforcePeriod==="2026-q3" ? "2026-q2" : saved.workforcePeriod;
   const state = {
-    marketPeriod:"latest", marketAge:"over", overviewYear:2025, marketRegion:"", overviewIndustry:null,
+    marketAge:"over", overviewYear:2025, marketRegion:"", overviewIndustry:null,
     wageRate:defaultWageRate, wageCurrency:"CNY", wageSort:"hk", wageIndustry:"",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
     industryDetails:[], budgetScope:true,
     ...saved,
-    workforcePeriod:Object.hasOwn(workforceAge.hongKong,saved.workforcePeriod) ? saved.workforcePeriod : "2025",
-    marketIndustry:saved.marketIndustry ?? wageAgeGroups[saved.wageIndustry] ?? "",
+    workforcePeriod:Object.hasOwn(workforceAge.hongKong,savedWorkforcePeriod) ? savedWorkforcePeriod : "2025",
+    marketIndustry:wageAgeGroups[saved.wageIndustry] ?? formerAgeGroups[saved.marketIndustry] ?? saved.marketIndustry ?? "",
   };
   const aliases = {
     "Manufacturing":"制造业","Construction":"建筑业","Import/export & wholesale":"进出口及批发",
@@ -96,13 +99,13 @@
     const periods = {
       "2024":t("2024 年（全年）","2024 (full year)"),
       "2025":t("2025 年（全年）","2025 (full year)"),
-      "2026-q3":t("2026 年 7–9 月","Jul–Sep 2026"),
+      "2026-q2":t("2026 年 4–6 月","Apr–Jun 2026"),
     };
     const hongKongPeriod = periods[state.workforcePeriod];
     const {bands,mainland2024,hongKong} = workforceAge;
     const ages = span(0,bands.length-1);
-    const ageRange = order=>parseInt(bands[order],10)<35 ? "under" : "over";
-    const first35 = ages.find(order=>ageRange(order)==="over");
+    const ageRange = order=>parseInt(bands[order],10)<40 ? "under" : "over";
+    const ageBoundary = ages.find(order=>ageRange(order)==="over")-0.5;
     const mainlandName = t("内地 2024 年","Mainland 2024");
     const hongKongName = t(`香港 ${hongKongPeriod}`,`Hong Kong ${hongKongPeriod}`);
     const regionEntries = [["内地",mainlandName,purple],["香港",hongKongName,rose]];
@@ -115,20 +118,21 @@
       height:width>=390 ? 310 : 238,
       x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
       xFormat:order=>bands[order], yFormat:percent, yTicks:[0,5,10,15], right:24,
-      highlightX:state.marketAge==="under" ? [ages[0],first35-0.5] : [first35-0.5,ages.at(-1)],
+      highlightX:state.marketAge==="under" ? [ages[0],ageBoundary] : [ageBoundary,ages.at(-1)],
       action:"marketAge", label:t("两地就业人口年龄分布","Age distribution of workers in the two markets"),
     }));
     return heading(pages[0],0,"market-compare")
+      + controls(select("workforcePeriod",t("两张年龄图共用的香港时期","Hong Kong period for both age charts"),Object.keys(periods),period=>periods[period]),
+          hint("内地两图均采用 2024 年。左图为全国，右图为城镇。","Both Mainland series use 2024. The left chart covers the whole country and the right covers urban areas."))
       + `<div class="grid wide-pair market-ages">`
       + figure("ages",t("就业人口年龄结构","Employed population by age"),t("各年龄段占当地就业人口的比例","Share of local employment by age group"),
           agePlot + `<p class="mode-note market-age-band">${state.marketAge==="under"
-            ? t("已突出图中 20–34 岁组。","Highlighted here: ages 20–34.")
-            : t("已突出图中 35 岁及以上各组。","Highlighted here: ages 35 and over.")}</p>`,
+            ? t("已突出图中 20–39 岁组。","Highlighted here: ages 20–39.")
+            : t("已突出图中 40 岁及以上各组。","Highlighted here: ages 40 and over.")}</p>`,
           t("内地以 2024 年劳动力调查作为参照。两地就业定义有差异，图中从 20 岁起列示。点选年龄组可切换右图的年龄范围。",
             "Mainland figures use the 2024 labour force survey as a reference. Employment definitions differ by market. The chart starts at age 20. Select a point to switch the age band in the industry chart."),
-          {control:select("workforcePeriod",t("香港统计时期","Hong Kong reference period"),Object.keys(periods),period=>periods[period]),
-            key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
-      + marketIndustryAge()
+          {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
+      + marketIndustryAge(hongKongPeriod)
       + `</div>`
       + marketUnemployment()
       + shenzhenHongKongPay()
@@ -138,24 +142,17 @@
         ${state.pairs.length ? `<p id="own-search-note">${t("从这里开始会清空已选方向和对应的面试备注。","Starting here clears your shortlist and its interview notes.")}</p>` : ""}</div>`;
   }
 
-  function marketIndustryAge() {
-    const ageLabel = band=>band==="under" ? t("35 岁以下","Under 35") : t("35 岁及以上","35 and over");
-    const periods = {
-      early:t("内地 2010／香港 2011","Mainland 2010 / Hong Kong 2011"),
-      latest:t("内地 2020／香港 2021","Mainland 2020 / Hong Kong 2021"),
-    };
-    const kind = state.marketPeriod==="early" ? "F_行业35_早期" : "G_行业35_最新";
-    const rows = [...by(d.markets.filter(row=>row.kind===kind),"label")].map(([key,group])=>{
-      const share = region=>{
-        const value = group.find(row=>row.region===region)?.value;
-        return state.marketAge==="under" ? value : 100-value;
-      };
-      const mainland = share("内地"), hk = share("香港");
-      return {key, name:label(key), mainland, hk, gap:Number((hk-mainland).toFixed(2))};
+  function marketIndustryAge(hongKongPeriod) {
+    const ageLabel = band=>band==="under" ? t("40 岁以下","Under 40") : t("40 岁及以上","40 and over");
+    const share = value=>state.marketAge==="under" ? 100-value : value;
+    const rows = workforceAge.industries.map(industry=>{
+      const [total,age40Plus] = industry.hongKong[state.workforcePeriod];
+      const mainland = share(industry.mainland), hk = share(age40Plus/total*100);
+      return {key:industry.id, name:t(...industry.name), mainland, hk, gap:hk-mainland};
     }).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
     const gapFormat = new Intl.NumberFormat(language.code(),{minimumFractionDigits:1,maximumFractionDigits:1,signDisplay:"exceptZero"});
     const gapLabel = gap=>gapFormat.format(gap).replace(/^-/,"−");
-    const comparison = row=>t(`内地 ${percent(row.mainland)} · 香港 ${percent(row.hk)}`,`Mainland ${percent(row.mainland)} · Hong Kong ${percent(row.hk)}`);
+    const comparison = row=>t(`内地城镇 ${percent(row.mainland)} · 香港 ${percent(row.hk)}`,`Urban Mainland ${percent(row.mainland)} · Hong Kong ${percent(row.hk)}`);
     const title = t("哪些行业的年龄结构差异最大？","Which industries have the biggest age gaps?");
     const chart = `<div class="industry-gap-chart" role="group" aria-label="${esc(title)}">
       <div class="industry-gap-row industry-gap-axis" aria-hidden="true">
@@ -177,14 +174,12 @@
     const wageLink = `<a class="secondary-link" href="#pay-comparison" data-scroll="pay-comparison">${t("查看对应行业的深港工资","See corresponding Shenzhen–Hong Kong wages")}</a>`;
     const detail = picked ? `<div class="industry-gap-detail" role="status"><strong>${esc(picked.name)}</strong> · ${comparison(picked)}
       <p>${hasWage ? wageLink : t("现有深港工资图缺少这一大类的对应行业数据。","The wage chart has no corresponding industry data for this group.")}</p></div>` : "";
-    return figure("industry-age",title,periods[state.marketPeriod]+" · "+ageLabel(state.marketAge),
+    const period = t(`内地城镇 2024 年 · 香港 ${hongKongPeriod}`,`Urban Mainland 2024 · Hong Kong ${hongKongPeriod}`);
+    return figure("industry-age",title,period+" · "+ageLabel(state.marketAge),
       chart+detail,
-      t("条向右表示香港占比较高，向左表示内地占比较高。分母为各地该行业的就业人口。两地相差一年，内地部分数值为项目估计。",
-        "Bars point right when Hong Kong has the higher share and left when Mainland China does. Shares are within each local industry. Snapshots are one year apart. Some Mainland values are project estimates."),
-      {control:`<div class="card-controls market-age-controls">
-        ${select("marketPeriod",t("统计时期","Reference period"),Object.keys(periods),period=>periods[period])}
-        ${select("marketAge",t("年龄范围","Age band"),["over","under"],ageLabel)}
-      </div>`});
+      t("条向右表示香港占比较高，向左表示内地城镇占比较高。分母为各地该组就业人口。按两地统计分类合并为六组，详细口径见数据来源。",
+        "Bars point right when Hong Kong has the higher share and left when urban Mainland China does. Shares are within each group. The six groups combine the two statistical classifications. See Data and methods for details."),
+      {control:select("marketAge",t("年龄范围","Age band"),["over","under"],ageLabel)});
   }
 
   function marketUnemployment() {
@@ -269,7 +264,8 @@
     const selected = rows.find(row=>row.id===state.wageIndustry);
     const ageChartLink = `<a class="secondary-link" href="#industry-age" data-scroll="industry-age">${t("查看对应大类的年龄差异","See the age gap for this industry group")}</a>`;
     const selection = selected ? `<p class="mode-note wage-selection">${esc(selected.note)} ${ageChartLink}</p>` : "";
-    const groupName = label(state.marketIndustry);
+    const group = workforceAge.industries.find(industry=>industry.id===state.marketIndustry);
+    const groupName = group ? t(...group.name) : "";
     const related = !selected && rows.some(row=>wageAgeGroups[row.id]===state.marketIndustry);
     const groupNote = related ? hint(`已突出「${groupName}」对应的工资行业。`,`Highlighted wage industries for ${groupName}.`) : "";
     return figure("pay-comparison",title,t("2024 年 · 男女合计 · 金额取整","2024 · Both sexes combined · Rounded to whole currency units"),
@@ -695,7 +691,6 @@
   }
 
   function sources() {
-    const census = (url,zh,en)=>`<a href="https://www.stats.gov.cn/sj/pcsj/rkpc/${url}">${t(zh,en)}</a>`;
     const hk = (code,zh,en)=>`<a href="https://www.censtatd.gov.hk/en/web_table.html?id=${code}">${code} · ${t(zh,en)}</a>`;
     return `<header class="chapter-header"><h1>${t("数据来源与统计口径","Data and methods")}</h1>
     <p>${t("图表来自整合工作簿中的原项目数据及新增官方数据。两地数据按各自调查范围和观察期展示。",
@@ -703,11 +698,11 @@
     <section class="card source-card">
       <h3>${t("两地对照","Two markets")}</h3>
       <ul><li><a href="https://dashboard.laodongqushi.com/yearbook/2025/">${t("《中国劳动统计年鉴 2025》表 2-10","China Labour Statistical Yearbook 2025, Table 2-10")}</a> ·
-      ${hk("210-06301","香港按年龄及性别划分的就业人数","Hong Kong employed persons by age and sex")}${t("。就业人口年龄结构图使用内地 2024 年全国劳动力调查，以及香港 2024、2025 全年和 2026 年 7–9 月的调查数据。占比均以各地全部就业人口为分母。",
-        ". The workforce age chart uses the Mainland’s 2024 national labour force survey and Hong Kong survey data for full-year 2024, full-year 2025 and July–September 2026. Shares use each market’s total employed population.")}</li>
-      <li>${census("5rp/html/l0404.htm","内地 2010 年人口普查","Mainland China 2010 Census")} ·
-      ${census("6rp/html/B0402a.htm","内地 2020 年人口普查","Mainland China 2020 Census")}${t("。各行业 35 岁及以上占比由原项目的 35 岁以下占比取补数，沿用原有行业分类、时点和估计。",
-        ". Shares aged 35 and over are complements of the original under-35 shares. They use the original project’s industry groupings, reference years and estimates.")}</li>
+      ${hk("210-06301","香港按年龄及性别划分的就业人数","Hong Kong employed persons by age and sex")}${t("。就业人口年龄结构图使用内地 2024 年全国劳动力调查。两张年龄图共用香港时期，可选 2024、2025 全年和 2026 年 4–6 月。左图以各地全部就业人口为分母。",
+        ". The workforce age chart uses the Mainland’s 2024 national labour force survey. The Hong Kong period is shared between both charts, with full-year 2024, full-year 2025 and April–June 2026 available. The left chart uses each market’s total employed population.")}</li>
+      <li><a href="https://dashboard.laodongqushi.com/yearbook/2025/">${t("《中国劳动统计年鉴 2025》表 2-17、2-18","China Labour Statistical Yearbook 2025, Tables 2-17 and 2-18")}</a> ·
+      ${hk("210-06306","香港按行业、年龄及性别划分的就业人数","Hong Kong employed persons by industry, age and sex")}${t("。行业图的内地数据为 2024 年全国城镇样本，合并行业按就业占比加权。香港按对应行业组的 40 岁及以上人数除以该组就业人数。两地行业分类相近的部分合并为六组。",
+        ". The industry chart uses the Mainland’s 2024 urban survey, weighting combined industries by employment share. Hong Kong shares divide the count aged 40 and over by total employment within each industry group. The chart combines comparable industries into six broad groups.")}</li>
       <li>${hk("210-06201","香港政府统计处劳动人口表","Hong Kong C&SD labour force table")}${t("提供劳动人口背景。两地行业、年龄定义及年份见整合 Excel 的「00_口径限制」。",
         " provides labour force context. See the consolidated workbook’s 00 methods sheet for definitions and reference years.")}</li>
       <li><a href="https://www.stats.gov.cn/sj/xwfbh/fbhwd/202601/t20260119_1962330.html">${t("国家统计局 · 2025 年就业形势","National Bureau of Statistics · 2025 employment conditions")}</a> ·
