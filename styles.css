@@ -75,11 +75,7 @@ main:has(.market-ages) { max-width: none; }
 #pay-comparison, .market-next { margin-block-start: 15px; }
 .market-age-controls { margin-top: 4px; }
 .age-range-highlight { fill: #f0e4f2; }
-.age-focus-highlight { fill: #e4cadc; }
-.market-age-band { margin-top: 5px; }
-.market-age-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,170px),1fr)); gap: 8px; margin-top: 9px; }
-.market-age-stat { padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
-.market-age-focus { background: #f7edf4; border-color: #e4cadc; }
+.market-age-comparison { color: var(--ink); margin-bottom: 5px; }
 .industry-gap-row {
   display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) minmax(98px, 43%) 42px;
   align-items: center; gap: 8px; min-height: 36px; padding: 3px 6px; text-align: start; font-size: 12px;

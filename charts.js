@@ -51,9 +51,9 @@
     };
     const a = axes(w,h,d);
     let out = "";
-    for (const {range,className} of opt.ageHighlights ?? []) {
-      const [start,end] = range.map(a.x);
-      out += `<rect class="${className}" x="${start}" y="${a.top}" width="${end-start}" height="${a.bottom-a.top}" aria-hidden="true"/>`;
+    if (opt.highlightX) {
+      const [start,end] = opt.highlightX.map(a.x);
+      out += `<rect class="age-range-highlight" x="${start}" y="${a.top}" width="${end-start}" height="${a.bottom-a.top}" aria-hidden="true"/>`;
     }
     out += a.grid;
     if (Number.isFinite(opt.refY)) out += line(a.left,a.y(opt.refY),a.right,a.y(opt.refY),"refline");
