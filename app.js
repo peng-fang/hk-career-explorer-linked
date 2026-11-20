@@ -1,6 +1,7 @@
 (() => {
   "use strict";
   const d = globalThis.guideData;
+  const workforceAge = globalThis.workforceAge;
   const c = globalThis.guideCharts;
   const language = globalThis.guideLanguage;
   const pathway = globalThis.guidePathway;
@@ -40,6 +41,7 @@
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
     industryDetails:[], budgetScope:true,
     ...saved,
+    workforcePeriod:Object.hasOwn(workforceAge.hongKong,saved.workforcePeriod) ? saved.workforcePeriod : "2025",
     marketIndustry:saved.marketIndustry ?? wageAgeGroups[saved.wageIndustry] ?? "",
   };
   const aliases = {
@@ -91,33 +93,41 @@
   };
 
   function markets() {
-    const snapshot = d.markets.filter(r=>r.kind==="A_2010年龄对照");
-    const ages = [...by(snapshot,"order").keys()].sort((a,b)=>a-b);
-    const ageNames = new Map(snapshot.map(row=>[row.order,row.label.replace("-","–")]));
-    const ageRange = order=>parseInt(ageNames.get(order),10)<35 ? "under" : "over";
+    const periods = {
+      "2024":t("2024 年（全年）","2024 (full year)"),
+      "2025":t("2025 年（全年）","2025 (full year)"),
+      "2026-q3":t("2026 年 7–9 月","Jul–Sep 2026"),
+    };
+    const hongKongPeriod = periods[state.workforcePeriod];
+    const {bands,mainland2024,hongKong} = workforceAge;
+    const ages = span(0,bands.length-1);
+    const ageRange = order=>parseInt(bands[order],10)<35 ? "under" : "over";
     const first35 = ages.find(order=>ageRange(order)==="over");
-    const regionEntries = [["内地",label("内地"),purple],["香港",label("香港"),rose]];
+    const mainlandName = t("内地 2024 年","Mainland 2024");
+    const hongKongName = t(`香港 ${hongKongPeriod}`,`Hong Kong ${hongKongPeriod}`);
+    const regionEntries = [["内地",mainlandName,purple],["香港",hongKongName,rose]];
+    const shares = [mainland2024,hongKong[state.workforcePeriod]];
     const sets = regionEntries.map(([key,name,color],index)=>({
-      ...lineSet(name,snapshot.filter(row=>row.region===key).sort((a,b)=>a.order-b.order)
-        .map(row=>[row.order,row.value,`${name} · ${ageNames.get(row.order)} · ${percent(row.value)}`]),color,index===1),
+      ...lineSet(name,shares[index].map((value,order)=>[order,value,`${name} · ${bands[order]} · ${percent(value)}`]),color,index===1),
       key, opacity:state.marketRegion && state.marketRegion!==key ? 0.45 : 1, pointValue:ageRange,
     }));
     const agePlot = viz("workforce-age",width=>c.series(width,sets,{
       height:width>=390 ? 310 : 238,
       x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
-      xFormat:order=>ageNames.get(order), yFormat:percent, yTicks:[0,5,10,15], right:24,
+      xFormat:order=>bands[order], yFormat:percent, yTicks:[0,5,10,15], right:24,
       highlightX:state.marketAge==="under" ? [ages[0],first35-0.5] : [first35-0.5,ages.at(-1)],
       action:"marketAge", label:t("两地就业人口年龄分布","Age distribution of workers in the two markets"),
     }));
     return heading(pages[0],0,"market-compare")
       + `<div class="grid wide-pair market-ages">`
-      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("2010 年 · 各年龄段占比","2010 · Share by age group"),
+      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("各年龄段占当地就业人口的比例","Share of local employment by age group"),
           agePlot + `<p class="mode-note market-age-band">${state.marketAge==="under"
             ? t("已突出图中 20–34 岁组。","Highlighted here: ages 20–34.")
             : t("已突出图中 35 岁及以上各组。","Highlighted here: ages 35 and over.")}</p>`,
-          t("每个点代表一个年龄组，占比以当地就业人口为分母。图中从 20 岁起列示，两地就业定义有差异。点选年龄组可切换右图的年龄范围。",
-            "Each point represents an age group as a share of local employment. The chart starts at age 20, and employment definitions differ by market. Select a point to switch the age band in the industry chart."),
-          {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
+          t("内地以 2024 年劳动力调查作为参照。两地就业定义有差异，图中从 20 岁起列示。点选年龄组可切换右图的年龄范围。",
+            "Mainland figures use the 2024 labour force survey as a reference. Employment definitions differ by market. The chart starts at age 20. Select a point to switch the age band in the industry chart."),
+          {control:select("workforcePeriod",t("香港统计时期","Hong Kong reference period"),Object.keys(periods),period=>periods[period]),
+            key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
       + marketIndustryAge()
       + `</div>`
       + marketUnemployment()
@@ -692,7 +702,10 @@
       "Charts use the original project extracts and new official figures in the consolidated workbook. Figures follow the coverage and period of their source surveys.")}</p></header>
     <section class="card source-card">
       <h3>${t("两地对照","Two markets")}</h3>
-      <ul><li>${census("5rp/html/l0404.htm","内地 2010 年人口普查","Mainland China 2010 Census")} ·
+      <ul><li><a href="https://dashboard.laodongqushi.com/yearbook/2025/">${t("《中国劳动统计年鉴 2025》表 2-10","China Labour Statistical Yearbook 2025, Table 2-10")}</a> ·
+      ${hk("210-06301","香港按年龄及性别划分的就业人数","Hong Kong employed persons by age and sex")}${t("。就业人口年龄结构图使用内地 2024 年全国劳动力调查，以及香港 2024、2025 全年和 2026 年 7–9 月的调查数据。占比均以各地全部就业人口为分母。",
+        ". The workforce age chart uses the Mainland’s 2024 national labour force survey and Hong Kong survey data for full-year 2024, full-year 2025 and July–September 2026. Shares use each market’s total employed population.")}</li>
+      <li>${census("5rp/html/l0404.htm","内地 2010 年人口普查","Mainland China 2010 Census")} ·
       ${census("6rp/html/B0402a.htm","内地 2020 年人口普查","Mainland China 2020 Census")}${t("。各行业 35 岁及以上占比由原项目的 35 岁以下占比取补数，沿用原有行业分类、时点和估计。",
         ". Shares aged 35 and over are complements of the original under-35 shares. They use the original project’s industry groupings, reference years and estimates.")}</li>
       <li>${hk("210-06201","香港政府统计处劳动人口表","Hong Kong C&SD labour force table")}${t("提供劳动人口背景。两地行业、年龄定义及年份见整合 Excel 的「00_口径限制」。",
