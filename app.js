@@ -32,11 +32,11 @@
     "land-transport":"运输仓储邮政", "real-estate":"金融地产商务", wholesale:"批发零售/进出口",
     retail:"批发零售/进出口", accommodation:"住宿餐饮", food:"住宿餐饮",
   };
-  const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,marketPeriod:formerIndustryPeriod,...saved} = pathway.load();
+  const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,marketPeriod:formerIndustryPeriod,workforceView:formerWorkforceView,...saved} = pathway.load();
   const savedWorkforcePeriod = ["2026-q2","2026-q3"].includes(saved.workforcePeriod) ? "2026-h1" : saved.workforcePeriod;
   const savedMarketIndustry = wageAgeGroups[saved.wageIndustry] ?? saved.marketIndustry;
   const state = {
-    marketAge:"over", workforceView:"illustration", overviewYear:2025, marketRegion:"", overviewIndustry:null,
+    marketAge:"over", overviewYear:2025, marketRegion:"", overviewIndustry:null,
     wageRate:defaultWageRate, wageCurrency:"CNY", wageSort:"hk", wageIndustry:"",
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
@@ -101,32 +101,28 @@
       "2026-h1":t("2026 年 1–6 月","Jan–Jun 2026"),
     };
     const periodLabel = periods[state.workforcePeriod];
-    const illustrative = state.workforceView==="illustration";
     const illustrationLabel = t("走势示意（模拟数据）","Illustration (simulated data)");
-    const {bands,mainland,hongKong} = workforceAge;
+    const {bands} = workforceAge;
     const ages = span(0,bands.length-1);
     const ageRange = order=>parseInt(bands[order],10)<35 ? "under" : "over";
     const start35 = bands.indexOf("35–39");
     const ageBoundary = start35-0.5;
     const regionEntries = [["内地",t("内地城镇","Urban Mainland"),purple],["香港",t("香港","Hong Kong"),rose]];
-    let regionData = [mainland,hongKong];
-    if (illustrative) {
-      const reference = d.markets.filter(row=>row.kind==="A_2010年龄对照");
-      // Shift a small share from the younger bands to the older ones in each successive scenario.
-      const shifts = [[-0.1,-0.1,-0.1,0.1,0.1,0,0,0.1,0,0],[-0.1,-0.2,-0.1,0,0,0.1,0.1,0.1,0,0.1]];
-      regionData = regionEntries.map(([key],index)=>{
-        const baseline = reference.filter(row=>row.region===key).sort((a,b)=>a.order-b.order);
-        return Object.fromEntries(Object.keys(periods).map((period,step)=>
-          [period,baseline.map((row,band)=>row.value+step*shifts[index][band])]));
-      });
-    }
+    const reference = d.markets.filter(row=>row.kind==="A_2010年龄对照");
+    // Shift a small share from the younger bands to the older ones in each successive scenario.
+    const shifts = [[-0.1,-0.1,-0.1,0.1,0.1,0,0,0.1,0,0],[-0.1,-0.2,-0.1,0,0,0.1,0.1,0.1,0,0.1]];
+    const regionData = regionEntries.map(([key],index)=>{
+      const baseline = reference.filter(row=>row.region===key).sort((a,b)=>a.order-b.order);
+      return Object.fromEntries(Object.keys(periods).map((period,step)=>
+        [period,baseline.map((row,band)=>row.value+step*shifts[index][band])]));
+    });
     const shares = regionData.map(data=>data[state.workforcePeriod]);
     const highlightX = state.marketAge==="under" ? [ages[0],ageBoundary] : [ageBoundary,ages.at(-1)];
     const sets = regionEntries.map(([key,name,color],index)=>{
       const data = regionData[index];
       const points = shares[index].map((value,order)=>{
         const comparison = Object.entries(periods).map(([period,label])=>`${label} · ${percent(data[period][order])}`);
-        const heading = illustrative ? `${name} · ${bands[order]} · ${illustrationLabel}` : `${name} · ${bands[order]}`;
+        const heading = `${name} · ${bands[order]} · ${illustrationLabel}`;
         return [order,value,[heading,...comparison].join("\n")];
       });
       return {
@@ -135,13 +131,12 @@
         strokeWidth:state.marketRegion===key ? 3.2 : 2.4,
       };
     });
-    const yMax = illustrative ? 15 : 20;
     const agePlot = viz("workforce-age",width=>c.series(width,sets,{
       height:width>=390 ? 310 : 238,
       x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
-      xFormat:order=>bands[order], yFormat:percent, y:[0,yMax], yTicks:span(0,yMax/5).map(tick=>tick*5), right:24,
+      xFormat:order=>bands[order], yFormat:percent, y:[0,15], yTicks:[0,5,10,15], right:24,
       highlightX,
-      action:"marketAge", label:illustrative ? illustrationLabel : t("两地就业人口年龄分布","Age distribution of workers in the two markets"),
+      action:"marketAge", label:illustrationLabel,
     }));
     const [urban35Plus,hk35Plus] = shares.map(values=>values.slice(start35).reduce((total,share)=>total+share,0));
     const overallComparison = (name,urbanShare,hkShare)=>{
@@ -150,27 +145,21 @@
       const relation = percent(higher[1])===percent(lower[1]) ? t("与","and") : t("高于","compared with");
       return `<p><strong>${name}</strong> · ${higher[0]} ${percent(higher[1])} ${relation} ${lower[0]} ${percent(lower[1])}</p>`;
     };
-    const ageMethod = illustrative
-      ? t("走势以原图的 2010 年点位为起点，各时期作小幅模拟调整。","The illustration starts from the original chart’s 2010 values and applies small simulated changes across periods.")
-      : t("占比分母为两地各自的全部就业人口，折线从 20 岁起显示。","Shares use all workers in each market. Lines start at age 20.");
     const ageCaption = `<div class="market-age-comparison">
       ${overallComparison(t("35 岁以下","Under 35"),100-urban35Plus,100-hk35Plus)}
       ${overallComparison(t("35 岁及以上","35 and over"),urban35Plus,hk35Plus)}
-    </div><p>${ageMethod} ${t("悬停或聚焦数据点可查看三个时期，点选可切换右图的年龄范围。",
-      "Hover or focus a point to see all three periods. Select it to change the age band in the industry chart.")}</p>`;
-    const periodNotes = [
-      illustrative ? t("左图展示模拟走势，右图展示分行业比较。","The left chart shows a simulation. The right chart compares industries.") : "",
-      state.workforcePeriod!=="2024" ? t("统计数据中的内地城镇数值依据 2023–2024 年的变化推算。","Urban Mainland figures in the statistical data are projected from changes between 2023 and 2024.") : "",
-    ].filter(Boolean).join(" ");
-    const views = {illustration:t("走势示意","Illustration"),statistics:t("统计数据","Statistical data")};
+    </div><p>${t("走势以原图的 2010 年点位为起点，各时期作小幅模拟调整。悬停或聚焦数据点可查看三个时期，点选可切换右图的年龄范围。",
+      "The illustration starts from the original chart’s 2010 values and applies small simulated changes across periods. Hover or focus a point to see all three periods. Select it to change the age band in the industry chart.")}</p>`;
+    const periodNote = state.workforcePeriod==="2024"
+      ? hint("左图展示模拟走势，右图展示分行业比较。","The left chart shows a simulation. The right chart compares industries.")
+      : hint("左图展示模拟走势，右图的内地城镇数值依据 2023–2024 年的变化推算。",
+          "The left chart shows a simulation. The industry chart’s urban Mainland figures are projected from changes between 2023 and 2024.");
     return heading(pages[0],0,"market-compare")
-      + controls(select("workforcePeriod",t("两张年龄图共用时期","Shared period for both age charts"),Object.keys(periods),period=>periods[period]),
-        periodNotes ? `<p class="mode-note">${periodNotes}</p>` : "")
+      + controls(select("workforcePeriod",t("两张年龄图共用时期","Shared period for both age charts"),Object.keys(periods),period=>periods[period]),periodNote)
       + `<div class="grid wide-pair market-ages">`
       + figure("ages",t("就业人口年龄结构","Employed population by age"),
-          `${periodLabel} · ${illustrative ? illustrationLabel : t("各年龄段占比","Share by age group")}`,agePlot,ageCaption,
-          {control:select("workforceView",t("数据视图","Data view"),Object.keys(views),view=>views[view]),
-            key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
+          `${periodLabel} · ${illustrationLabel}`,agePlot,ageCaption,
+          {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
       + marketIndustryAge(periodLabel)
       + `</div>`
       + marketUnemployment()
@@ -738,10 +727,10 @@
       "Charts use the original project extracts and new official figures in the consolidated workbook. Figures follow the coverage and period of their source surveys.")}</p></header>
     <section class="card source-card">
       <h3>${t("两地对照","Two markets")}</h3>
-      <ul><li>${t("年龄结构图的走势示意采用原项目 2010 年曲线为基线，其后各时期的点位为模拟。切换到「统计数据」可查看同期调查数据及推算结果。",
-        "The age chart’s illustration uses the original project’s 2010 curves as a baseline and simulates small changes across periods. Select Statistical data for survey figures and projections.")}</li>
-      <li>${t("年龄结构图的统计数据和分行业年龄图均使用内地城镇口径。2024 年数据来自城镇劳动力调查，合并行业按就业占比加权。2025 全年及 2026 年 1–6 月占比按 2023 至 2024 年的变化幅度线性外推。",
-        "The age chart’s Statistical data view and the industry age chart use urban Mainland data. The 2024 observations come from the urban labour force survey. Combined industries are weighted by employment share. Figures for full-year 2025 and January–June 2026 extrapolate the 2023–2024 change linearly.")}
+      <ul><li>${t("年龄结构图的走势示意采用原项目 2010 年曲线为基线，各时期的点位为模拟。",
+        "The age chart’s illustration uses the original project’s 2010 curves as a baseline and simulates small changes across periods.")}</li>
+      <li>${t("分行业年龄图使用内地城镇口径。2024 年数据来自城镇劳动力调查，合并行业按就业占比加权。2025 全年及 2026 年 1–6 月占比按 2023 至 2024 年的变化幅度线性外推。",
+        "The industry age chart uses urban Mainland data. The 2024 observations come from the urban labour force survey. Combined industries are weighted by employment share. Figures for full-year 2025 and January–June 2026 extrapolate the 2023–2024 change linearly.")}
       <a href="https://dashboard.laodongqushi.com/yearbook/2024/">${t("《中国劳动统计年鉴 2024》表 1-49、1-50","China Labour Statistical Yearbook 2024, Tables 1-49 and 1-50")}</a> ·
       <a href="https://dashboard.laodongqushi.com/yearbook/2025/">${t("《中国劳动统计年鉴 2025》表 2-17、2-18","China Labour Statistical Yearbook 2025, Tables 2-17 and 2-18")}</a></li>
       <li>${t("香港使用相同统计时期的综合住户调查。2026 年 1–6 月合并第一、第二季度就业人数后计算占比。香港分行业表把 25–39 岁合为一组，按同期全港 25–39 岁就业者中 35–39 岁的比例分配，再加上行业 40 岁及以上人数。细行业按同期就业人数加权拆分，使用原项目 2021 年香港行业间的 35 岁及以上占比差作参照。「其他」组两地覆盖范围有差异。",
