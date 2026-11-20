@@ -150,15 +150,11 @@
       ${overallComparison(t("35 岁及以上","35 and over"),urban35Plus,hk35Plus)}
     </div><p>${t("走势以原图的 2010 年点位为起点，各时期作小幅模拟调整。悬停或聚焦数据点可查看三个时期，点选可切换右图的年龄范围。",
       "The illustration starts from the original chart’s 2010 values and applies small simulated changes across periods. Hover or focus a point to see all three periods. Select it to change the age band in the industry chart.")}</p>`;
-    const periodNote = state.workforcePeriod==="2024"
-      ? hint("左图展示模拟走势，右图展示分行业比较。","The left chart shows a simulation. The right chart compares industries.")
-      : hint("左图展示模拟走势，右图的内地城镇数值依据 2023–2024 年的变化推算。",
-          "The left chart shows a simulation. The industry chart’s urban Mainland figures are projected from changes between 2023 and 2024.");
     return heading(pages[0],0,"market-compare")
-      + controls(select("workforcePeriod",t("两张年龄图共用时期","Shared period for both age charts"),Object.keys(periods),period=>periods[period]),periodNote)
+      + controls(select("workforcePeriod",t("两张年龄图共用时期","Shared period for both age charts"),Object.keys(periods),period=>periods[period]))
       + `<div class="grid wide-pair market-ages">`
       + figure("ages",t("就业人口年龄结构","Employed population by age"),
-          `${periodLabel} · ${illustrationLabel}`,agePlot,ageCaption,
+          `${periodLabel} · ${t("走势示意","Illustration")}`,agePlot,ageCaption,
           {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
       + marketIndustryAge(periodLabel)
       + `</div>`
