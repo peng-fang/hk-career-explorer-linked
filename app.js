@@ -106,15 +106,22 @@
     const ageRange = order=>parseInt(bands[order],10)<35 ? "under" : "over";
     const start35 = bands.indexOf("35–39");
     const ageBoundary = start35-0.5;
-    const mainlandName = t(`内地城镇 ${periodLabel}`,`Urban Mainland ${periodLabel}`);
-    const hongKongName = t(`香港 ${periodLabel}`,`Hong Kong ${periodLabel}`);
-    const regionEntries = [["内地",mainlandName,purple],["香港",hongKongName,rose]];
-    const shares = [mainland[state.workforcePeriod],hongKong[state.workforcePeriod]];
+    const regionEntries = [["内地",t("内地城镇","Urban Mainland"),purple],["香港",t("香港","Hong Kong"),rose]];
+    const regionData = [mainland,hongKong];
+    const shares = regionData.map(data=>data[state.workforcePeriod]);
     const highlightX = state.marketAge==="under" ? [ages[0],ageBoundary] : [ageBoundary,ages.at(-1)];
-    const sets = regionEntries.map(([key,name,color],index)=>({
-      ...lineSet(name,shares[index].map((value,order)=>[order,value,`${name} · ${bands[order]} · ${percent(value)}`]),color,index===1),
-      key, opacity:state.marketRegion && state.marketRegion!==key ? 0.45 : 1, pointValue:ageRange,
-    }));
+    const sets = regionEntries.map(([key,name,color],index)=>{
+      const data = regionData[index];
+      const points = shares[index].map((value,order)=>{
+        const comparison = Object.entries(periods).map(([period,label])=>`${label} · ${percent(data[period][order])}`);
+        return [order,value,[`${name} · ${bands[order]}`,...comparison].join("\n")];
+      });
+      return {
+        ...lineSet(name,points,color,index===1),key,pointValue:ageRange,
+        opacity:state.marketRegion && state.marketRegion!==key ? 0.82 : 1,
+        strokeWidth:state.marketRegion===key ? 3.2 : 2.4,
+      };
+    });
     const agePlot = viz("workforce-age",width=>c.series(width,sets,{
       height:width>=390 ? 310 : 238,
       x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
@@ -124,7 +131,7 @@
     }));
     const [urban35Plus,hk35Plus] = shares.map(values=>values.slice(start35).reduce((total,share)=>total+share,0));
     const overallComparison = (name,urbanShare,hkShare)=>{
-      const regions = [[t("内地城镇","Urban Mainland"),urbanShare],[t("香港","Hong Kong"),hkShare]];
+      const regions = [[regionEntries[0][1],urbanShare],[regionEntries[1][1],hkShare]];
       const [higher,lower] = regions.sort((a,b)=>b[1]-a[1]);
       const relation = percent(higher[1])===percent(lower[1]) ? t("与","and") : t("高于","compared with");
       return `<p><strong>${name}</strong> · ${higher[0]} ${percent(higher[1])} ${relation} ${lower[0]} ${percent(lower[1])}</p>`;
@@ -132,15 +139,15 @@
     const ageCaption = `<div class="market-age-comparison">
       ${overallComparison(t("35 岁以下","Under 35"),100-urban35Plus,100-hk35Plus)}
       ${overallComparison(t("35 岁及以上","35 and over"),urban35Plus,hk35Plus)}
-    </div><p>${t("占比分母为两地各自的全部就业人口。折线从 20 岁起显示，底色表示当前选择的年龄范围。点选年龄组可切换右图。",
-      "Shares use the total employed population in each market. The lines start at age 20. Shading shows the selected age band. Select a point to switch the industry chart.")}</p>`;
+    </div><p>${t("占比分母为两地各自的全部就业人口。折线从 20 岁起显示。悬停或聚焦数据点可查看三个时期，点选可切换右图的年龄范围。",
+      "Shares use all workers in each market. Lines start at age 20. Hover or focus a point to see all three periods. Select it to change the age band in the industry chart.")}</p>`;
     const periodNote = state.workforcePeriod==="2024"
       ? hint("两张年龄图对照同一时期的内地城镇与香港。","Both age charts compare urban Mainland China with Hong Kong in the same period.")
       : hint("两张年龄图使用同一时期。内地城镇数值依据 2023–2024 年的变化推算。","Both age charts use the same period. Urban Mainland figures are projected from changes between 2023 and 2024.");
     return heading(pages[0],0,"market-compare")
       + controls(select("workforcePeriod",t("两张年龄图共用时期","Shared period for both age charts"),Object.keys(periods),period=>periods[period]),periodNote)
       + `<div class="grid wide-pair market-ages">`
-      + figure("ages",t("就业人口年龄结构","Employed population by age"),t("各年龄段占当地就业人口的比例","Share of local employment by age group"),
+      + figure("ages",t("就业人口年龄结构","Employed population by age"),`${periodLabel} · ${t("各年龄段占比","Share by age group")}`,
           agePlot, ageCaption,
           {key:filterLegend("marketRegion",regionEntries,state.marketRegion,"ages")})
       + marketIndustryAge(periodLabel)
