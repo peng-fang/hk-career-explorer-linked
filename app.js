@@ -13,6 +13,7 @@
   const charts = new Map();
   const openPanels = new Set();
   let chapter, observers = [];
+  let hoverBand = null;
   const item = (id, title, subtitle, question, summary) => ({
     id, get title() { return t(...title); }, get subtitle() { return t(...subtitle); },
     get question() { return t(...question); }, get summary() { return t(...summary); },
@@ -21,7 +22,7 @@
     item("markets",["两地对照","Two markets"],["香港值得深入看看吗？","Should I explore Hong Kong further?"],["毕业后，要不要把香港列为求职重点？","Should I focus my job search on Hong Kong?"],
       ["刚在香港读完硕士的嘉宁，正在考虑毕业后在哪里工作。她先看内地与香港的就业年龄结构和青年失业率，再参考深圳与香港的行业月薪。","Jia Ning has just finished her master’s degree in Hong Kong and is deciding where to look for work. She starts with workforce age and youth unemployment in both markets, then looks at industry wages in Shenzhen and Hong Kong."]),
     item("structure",["发现方向","Discover options"],["从行业趋势到求职方向","From industry trends to job options"],["在香港，我可以从哪些行业开始找工作？","Where could I start my job search in Hong Kong?"],
-      ["先看香港各行业有多少人在工作、近年有何变化。再结合自己的专业、兴趣和技能选职业组，到招聘热力表查看哪些行业有相关空缺。","Start with the size and trends of Hong Kong’s industries. Then use your studies, interests and skills to choose occupation groups and look for vacancies in the heatmap."]),
+      ["先看香港各行业有多少人在工作、近年有何变化。再结合自己的专业、兴趣和技能选职业组，在下方流向图查看哪些行业有相关空缺。","Start with the size and trends of Hong Kong’s industries. Then use your studies, interests and skills to choose occupation groups and look for vacancies in the flow chart below."]),
     item("fit",["试算个人条件","Test my criteria"],["工资、工时和生活费怎么算？","How do pay, hours and costs add up?"],["这些方向，能支撑我想要的香港生活吗？","Could these options support the life I want in Hong Kong?"],
       ["带入你选的行业和职业组合，用行业工资、工时和每月开支试算。调整一个条件，看看哪些方向仍值得优先投递。","Test your selected industry and occupation pairs against industry pay, working hours and your monthly costs. Change one assumption and see which options still look worth applying for first."]),
   ];
@@ -32,6 +33,26 @@
     "land-transport":"运输仓储邮政", "real-estate":"金融地产商务", wholesale:"批发零售/进出口",
     retail:"批发零售/进出口", accommodation:"住宿餐饮", food:"住宿餐饮",
   };
+  // 8 个就业大类（趋势图）与 10 个行业 ind（空缺交叉表）的对应；建造、其他大类无空缺口径。
+  const BAND_TO_INDS = {
+    0:["ind_C"], 1:[], 2:["ind_G45_46"], 3:["ind_G47","ind_I"],
+    4:["ind_H","ind_J"], 5:["ind_K","ind_L","ind_M_N"], 6:["ind_P_S"], 7:[],
+  };
+  const IND_TO_BAND = {};
+  Object.entries(BAND_TO_INDS).forEach(([band,inds])=>inds.forEach(ind=>{IND_TO_BAND[ind]=+band;}));
+  const occToInds = occ => d.occupations.filter(r=>r.name===occ && r.count>0)
+    .sort((a,b)=>b.count-a.count).map(r=>r.id);
+  const indToOccs = ind => d.occupations.filter(r=>r.id===ind && r.count>0)
+    .sort((a,b)=>b.count-a.count).map(r=>r.name);
+  const occTopBands = (occ,n=3) => [...new Set(occToInds(occ).slice(0,n)
+    .map(ind=>IND_TO_BAND[ind]).filter(b=>b!==undefined))];
+  function bandTopOccs(band,n=3) {
+    const sums={};
+    BAND_TO_INDS[band].forEach(ind=>d.occupations.filter(r=>r.id===ind)
+      .forEach(r=>{sums[r.name]=(sums[r.name]??0)+(r.count??0);}));
+    return Object.entries(sums).filter(([,v])=>v>0)
+      .sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k])=>k);
+  }
   const {fitBroad,fitDetails,fitCell,fitVacancyMode,fitOccupations,marketPeriod:formerIndustryPeriod,workforceView:formerWorkforceView,...saved} = pathway.load();
   const savedWorkforcePeriod = ["2026-q2","2026-q3"].includes(saved.workforcePeriod) ? "2026-h1" : saved.workforcePeriod;
   const savedMarketIndustry = wageAgeGroups[saved.wageIndustry] ?? saved.marketIndustry;
@@ -41,11 +62,30 @@
     selected:[], vacancyMode:"count", payYear:2025, startYear:2016,
     targetPay:25000, maxHours:42, targetSurplus:6000, offer:25000, rent:10000, living:6500, deduct:2000,
     profile:pathway.emptyProfile(), pairs:[], occupations:"all", taskOccupations:{}, vacancyCell:"", sortBy:"surplus",
-    industryDetails:[], budgetScope:true,
+    industryDetails:[], budgetScope:true, cross:null,
     ...saved,
     workforcePeriod:Object.hasOwn(workforceAge.hongKong,savedWorkforcePeriod) ? savedWorkforcePeriod : "2024",
     marketIndustry:workforceAge.industries.some(group=>group.id===savedMarketIndustry) ? savedMarketIndustry : "",
   };
+  state.cross=null;
+  let playing = false, playTimer = null;
+  function stopPlay() {
+    playing = false;
+    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  }
+  function togglePlay() {
+    if (playing) { stopPlay(); render(); return; }
+    playing = true;
+    const step = () => {
+      if (!playing) return;
+      const next = state.overviewYear >= 2025 ? 2016 : state.overviewYear + 1;
+      state.overviewYear = next;
+      render();
+      playTimer = setTimeout(step, 900);
+    };
+    playTimer = setTimeout(step, 260);
+    render();
+  }
   const aliases = {
     "Manufacturing":"制造业","Construction":"建筑业","Import/export & wholesale":"进出口及批发",
     "Retail & accommodation":"零售、住宿及餐饮","Transportation & information":"运输及资讯",
@@ -59,7 +99,14 @@
     "公共教育医疗社会个人服务":"公共、教育、医疗及社会服务",
     "其他（农林采矿/公用事业/国际组织）":"其他（农林、公用等）",
   };
+  const occShortEn = {
+    "Managers":"Managers","Professionals":"Professionals","Associate professionals":"Associate prof.",
+    "Clerical support workers":"Clerical support","Services and sales workers":"Services & sales",
+    "Skilled agricultural and fishery workers":"Skilled agri./fishy","Craft and related trades workers":"Craft trades",
+    "Plant and machine operators and assemblers":"Plant & machine operators","Elementary occupations":"Elementary",
+  };
   const label = x => t(aliases[x] ?? x, englishName(x));
+  const occLabel = g => t(aliases[g] ?? g, occShortEn[g] ?? g);
   const span = (a,b) => Array.from({length:b-a+1},(_,i)=>i+a);
   const historyX = p => Number(p.slice(0,4)) + (Number(p.slice(-1))-1)/4;
   const unique = data => [...new Set(data)];
@@ -74,7 +121,19 @@
   const grid = (...items) => `<div class="grid">${items.join("")}</div>`;
   const select = (key,title,choices,render=String,selected=state[key]) => `<label class="field">${title}<select id="${key}" data-control="${key}">
     ${choices.map(v=>`<option value="${esc(v)}"${selected===v?" selected":""}>${esc(render(v))}</option>`).join("")}</select></label>`;
-  const budgetField = (key,title,step) => `<label class="field">${title}<input id="${key}" type="number" min="0" max="${key==="maxHours"?168:10000000}" step="${step}" value="${state[key]}" data-control="${key}"></label>`;
+  const sliderRanges = {
+    targetPay:[0,60000,500], maxHours:[20,80,1], targetSurplus:[0,30000,500],
+    offer:[0,60000,500], rent:[0,30000,500], living:[0,20000,250], deduct:[0,15000,250],
+  };
+  const budgetField = (key,title,step) => {
+    const [rmin,rmax,rstep] = sliderRanges[key] ?? [0,60000,step];
+    const val = state[key];
+    const fill = Math.max(0, Math.min(100, (val - rmin) / (rmax - rmin) * 100));
+    return `<label class="field slider-field">
+      <span class="slider-caption">${title}<b id="num-${key}">${number(val)}</b></span>
+      <input class="slider" type="range" style="--fill:${fill}%" min="${rmin}" max="${rmax}" step="${rstep}" value="${val}" data-range="${key}" aria-label="${title}">
+      <input id="${key}" class="slider-number" type="number" min="${rmin}" max="${rmax}" step="${step}" value="${val}" data-control="${key}"></label>`;
+  };
   const controls = (...items) => `<div class="control-bar">${items.join("")}</div>`;
   const hint = (zh,en) => `<p class="mode-note">${t(zh,en)}</p>`;
   const stats = (...items) => `<div class="stats">${items.map(([value,caption])=>`<div class="stat"><strong>${value}</strong><span>${caption}</span></div>`).join("")}</div>`;
@@ -117,7 +176,6 @@
         [period,baseline.map((row,band)=>row.value+step*shifts[index][band])]));
     });
     const shares = regionData.map(data=>data[state.workforcePeriod]);
-    const highlightX = state.marketAge==="under" ? [ages[0],ageBoundary] : [ageBoundary,ages.at(-1)];
     const sets = regionEntries.map(([key,name,color],index)=>{
       const data = regionData[index];
       const points = shares[index].map((value,order)=>{
@@ -135,7 +193,6 @@
       height:width>=390 ? 310 : 238,
       x:[ages[0],ages.at(-1)], xTicks:width>=390 ? ages : ages.filter((_,i)=>i%2===0 && i<ages.length-2).concat(ages.at(-1)),
       xFormat:order=>bands[order], yFormat:percent, y:[0,15], yTicks:[0,5,10,15], right:24,
-      highlightX,
       action:"marketAge", label:illustrationLabel,
     }));
     const [urban35Plus,hk35Plus] = shares.map(values=>values.slice(start35).reduce((total,share)=>total+share,0));
@@ -306,7 +363,7 @@
     const industries=d.structure.filter(r=>r.kind==="industry_share");
     const years=unique(industries.map(r=>r.year)).sort((a,b)=>a-b);
     const counts = by(d.industryEmployment,"name");
-    const totalName = t("全港总量","Hong Kong total"), totalColor="#30213f";
+    const totalName = t("全港总量","Hong Kong total"), totalColor="#d6d3ec";
     const thousand = value=>`${number(value)}${t(" 千人"," thousand people")}`;
     const yearPoints = (name,rows)=>rows.slice().sort((a,b)=>a.year-b.year)
       .map(r=>[r.year,r.value,`${yearLabel(r.year)} · ${name} · ${thousand(r.value)}`]);
@@ -318,7 +375,7 @@
     const focused = sets[state.overviewIndustry];
     const biggest = sets.slice().sort((a,b)=>b.values[years.indexOf(year)]-a.values[years.indexOf(year)])[0];
     const highlighted = focused ?? biggest;
-    const totals = {...lineSet(totalName,yearPoints(totalName,d.total),totalColor),strokeWidth:3.2};
+    const totals = {...lineSet(totalName,yearPoints(totalName,d.total),totalColor),strokeWidth:3.2,area:true};
     const industryKeys = sets.map(s=>[String(s.key),s.name,s.color]);
     const activeIndustry = focused ? String(focused.key) : "all";
     const yearTicks = {xTicks:[2008,2012,2016,2020,2025],xFormat:String,refX:year,
@@ -331,12 +388,14 @@
       + controls(select("overviewYear",t("联动年份","Linked year"),span(2016,2025).reverse()),
         select("overviewIndustry",t("查看行业","Industry view"),["all",...sets.map(s=>String(s.key))],
           id=>id==="all"?allIndustries:sets[Number(id)].name,activeIndustry),
+        `<button type="button" class="play-btn${playing?" playing":""}" data-action="playTimeline"><span class="dot"></span>${playing?t("停止","Pause"):t("播放年份","Play years")}</button>`,
         hint("选择行业会同步更新人数图和占比图。点任一趋势图上的 2016–2025 年数据，可切换两张全港构成图的年份。",
           "Select an industry to update the headcount and share charts. Select a year from 2016 to 2025 on either trend chart to update both Hong Kong breakdowns."))
+      + crossBanner()
       + grid(
         figure("employment",t("香港就业人数","Hong Kong employment headcount"),(focused ? focused.name+" · " : "")+t("2008–2025 年 · 千人","2008–2025 · Thousands of people"),
           series("employment-line",focused?[focused]:[totals,...sets],
-            {...yearTicks,...(focused?{}:{y:[0,4200],yTicks:[0,1000,2000,3000,4000]}),
+            {...yearTicks,...(focused?{area:true}:{y:[0,4200],yTicks:[0,1000,2000,3000,4000]}),
               label:t("香港就业人数年度折线图","Annual employment headcount in Hong Kong")}),
           t("深色线是全港总量，彩线是各行业的就业人数。点某条行业折线的年份圆点，可同时选择行业和年份。单行业视图会调整纵轴，点「全港总量」可对照所有曲线。",
             "The dark line shows the Hong Kong total. Coloured lines show industry headcounts. Select a point to choose its industry and year. The scale adjusts in single-industry view. Choose “Hong Kong total” to restore all lines."),
@@ -344,21 +403,21 @@
         figure("industry",t("行业就业占比","Employment share by industry"),t("2008–2025 年 · 占全港就业的百分比","2008–2025 · Percentage of total employment"),
           focused ? series("industry-area",[lineSet(focused.name,
             years.map((y,i)=>[y,focused.values[i],`${focused.name} · ${yearLabel(y)} · ${percent(focused.values[i])}`]),focused.color)],
-            {...yearTicks,yFormat:percent,label:focused.name})
+            {...yearTicks,yFormat:percent,area:true,label:focused.name})
             : viz("industry-area",w=>c.stack(w,sets,years,year)),
           t("色带厚度表示该行业占全港就业的份额。点击色带或图例可查看单一行业，同时更新左侧人数图。",
             "Band thickness shows each industry’s share of total Hong Kong employment. Select a band or legend item to see one industry in both trend charts."),
           {key:filterLegend("overviewIndustry",industryKeys,activeIndustry,"industry"),
             control:focused ? chip("overviewIndustry","all",allIndustries) : ""}),
         figure("employment-status",t("雇佣身份构成","Employment status"),yearLabel(year)+t(" · 全港就业人口"," · Hong Kong employed population"),
-          c.donut(status.map(r=>({name:label(r.name),value:r.status}))),
+          c.donut(status.map(r=>({name:label(r.name),value:r.status,raw:r.name}))),
           t("比较受雇、自雇等身份的结构。刚毕业时可以从雇员岗位入手，再按具体工作形式扩展搜索。",
             "Compare employees, the self-employed and other groups. Jia Ning starts with employee roles and can broaden her search to other arrangements.")),
         figure("occupation",t("职业构成","Occupational mix"),yearLabel(year)+t(" · 全港就业人口"," · Hong Kong employed population"),
-          c.treemap(work.map(r=>({name:label(r.name),value:r.work,
+          c.treemap(work.map(r=>({name:occLabel(r.name),value:r.work,occ:r.name,
             occupation:pathway.occupationGroups.includes(r.name)?r.name:null}))),
-          t("方块面积表示该职业组的全港就业人数。点击热力表中也有的职业组，可直接查看当前空缺。",
-            "Tile area shows how many people in Hong Kong work in each occupation group. Select a group that is also in the heatmap to explore current vacancies.")));
+          t("方块面积表示该职业组的全港就业人数。点击职业组可在下方流向图查看当前空缺。",
+            "Tile area shows how many people in Hong Kong work in each occupation group. Select an occupation group to explore its current vacancies in the flow chart below.")));
     const rules = pathway.suggestions(state.profile);
     const taskGroups = new Set(rules.map(rule=>state.taskOccupations[rule.id]).filter(Boolean));
     return heading(pages[1],1)
@@ -370,72 +429,294 @@
       + vacancyPanel(taskGroups) + pairReview();
   }
 
-  function heatTable(rows, cols, read, format, corner, description) {
-    return `<div class="table-scroll" tabindex="0" aria-label="${esc(description + t("，可横向滚动",", scrolls horizontally"))}"><table class="heat" aria-label="${esc(description)}">
-      <thead><tr><th scope="col">${corner}</th>${cols.map(x=>`<th scope="col"${x.active?' class="heat-active"':""}>${esc(x.name ?? x)}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(r=>`<tr><th scope="row"${r.active?' class="heat-active"':""}>${esc(r.name)}</th>${cols.map(x=>{
-        const value=read(r.key,x.id ?? x), f=format(value,r,x);
-        if(!Number.isFinite(value)) return "<td>—</td>";
-        const tip=r.name+" · "+(x.name ?? x)+" · "+f.text;
-        return `<td><button type="button" data-action="${f.action}" data-value="${esc(f.key)}" data-focus="${esc(f.action+":"+f.key)}" data-tip="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${f.selected}" style="background:rgba(117,63,133,${f.opacity});color:${f.opacity>.62?"white":"#27192c"}">${f.text}</button></td>`;
-      }).join("")}</tr>`).join("")}</tbody></table></div>`;
+  // —— 沉浸式求职方向问答 ——
+  const majorIcons = {analytics:"📊",business:"💼",statistics:"📈",computing:"💻",engineering:"⚙️",science:"🔬",education:"🎓",health:"🩺",design:"🎨",other:"✨"};
+  const interestIcons = {analyse:"🔍",build:"🛠️",create:"🎨",research:"🔬",serve:"💬",organise:"🗂️",handsOn:"🔧",care:"❤️"};
+  const skillIcons = {sql:"🗄️",code:"⌨️",viz:"📊",writing:"✍️",production:"🎬",customers:"🤝",project:"📋",labs:"🧪"};
+  const archetypeMap = {
+    "data-analysis":{emoji:"🔍",name:["数据洞察型","The Data Insight"],desc:["你擅长从数据里找答案，把复杂信息讲清楚。","You turn data into clear answers and stories."]},
+    "information-systems":{emoji:"💻",name:["技术构建型","The Tech Builder"],desc:["你喜欢把东西做出来、跑起来，享受解决技术问题。","You like building things that work and solving technical problems."]},
+    "design-content":{emoji:"🎨",name:["创意表达型","The Creative Voice"],desc:["你有审美和表达欲，擅长把想法变成看得见的内容。","You turn ideas into visible, well-crafted content."]},
+    "engineering":{emoji:"⚙️",name:["工程实践型","The Engineering Hand"],desc:["你喜欢动手、到现场，把技术方案落到实处。","You like hands-on work that makes technical plans real."]},
+    "research-teaching":{emoji:"🔬",name:["研究探索型","The Research Mind"],desc:["你享受刨根问底、收集证据，也愿意把知识讲给别人。","You enjoy evidence, inquiry and sharing knowledge."]},
+    "health-care":{emoji:"❤️",name:["照护支持型","The Care Supporter"],desc:["你有耐心和同理心，愿意直接帮助具体的人。","You bring patience and empathy to help people directly."]},
+    "customer-service":{emoji:"🤝",name:["客户联结型","The People Connector"],desc:["你擅长理解人、建立信任，在沟通中推动事情。","You read people, build trust and move things through conversation."]},
+    "operations":{emoji:"🗂️",name:["组织协调型","The Organising Coordinator"],desc:["你能把杂乱的事情理出头绪，让团队运转顺畅。","You bring order so teams and workflows run smoothly."]},
+  };
+  const openArchetype = {emoji:"🧭",name:["开放探索型","The Open Explorer"],desc:["你还没有明显偏向，正好广泛看看各个方向。","No strong lean yet — a good time to explore broadly."]};
+  function buildQuizSteps() {
+    const opt = (catalog,icons)=>(id)=>({value:id,icon:icons[id]??"•",label:pathway.nameOf(catalog,id)});
+    return [
+      {kind:"single",field:"major",optional:true,
+        question:["你的专业背景更接近哪一类？","Which field best matches your studies?"],
+        options:Object.keys(pathway.majors).map(opt(pathway.majors,majorIcons))},
+      {kind:"multi",field:"interests",max:3,
+        question:["哪些工作内容会让你愿意投入？","Which work would you enjoy doing?"],
+        options:Object.keys(pathway.interests).map(opt(pathway.interests,interestIcons))},
+      {kind:"multi",field:"skills",max:3,
+        question:["你能拿出手的技能有哪些？","Which skills can you demonstrate?"],
+        options:Object.keys(pathway.skills).map(opt(pathway.skills,skillIcons))},
+      {kind:"text",field:"keywords",optional:true,
+        question:["有想带进工作的爱好或关键词吗？","Any hobbies or keywords to bring into work?"],
+        placeholder:t("例如摄影、零售数据分析，可留空","e.g. photography, retail analytics (optional)")},
+    ];
   }
-
   function profilePanel(rules) {
-    const profile = state.profile;
-    const major = (key, title) => `<label class="field">${title}<select id="${key}" data-profile="${key}">
-      <option value="">${t("请选择或跳过","Choose or skip")}</option>
-      ${Object.keys(pathway.majors).map(id => `<option value="${id}"${profile[key]===id?" selected":""}>${esc(pathway.nameOf(pathway.majors,id))}</option>`).join("")}
-      </select></label>`;
-    const tags = (key, title, options) => `<fieldset class="profile-tags"><legend>${title}</legend>
-      <div class="chip-row">${Object.keys(options).map(id => chip("profileTag",`${key}|${id}`,pathway.nameOf(options,id),profile[key].includes(id))).join("")}</div></fieldset>`;
-    return `<section class="card profile-card" aria-labelledby="profile-heading">
-      <div class="card-head"><div><h2 id="profile-heading">${t("我的求职背景","My search profile")}</h2>
-        <p class="card-unit">${t("按自己的背景选标签，查看相关工作任务和职业组。每一项都可以跳过。","Choose tags that describe you to see related work tasks and occupation groups. You can skip any field.")}</p></div>
-        <div class="chip-row">${chip("profileExample","jia",t("载入嘉宁的背景","Load Jia Ning’s profile"))}
-          ${chip("clearProfile","all",t("清空个人标签，浏览全部职业","Clear tags and browse all occupations"))}</div></div>
-      <div class="profile-majors">${major("major",t("主专业","Main field of study"))}${major("minor",t("辅方向","Additional field"))}</div>
-      ${tags("interests",t("我喜欢的工作任务（最多三项）","Tasks I enjoy (up to three)"),pathway.interests)}
-      ${tags("skills",t("我能展示的技能（最多三项）","Skills I can demonstrate (up to three)"),pathway.skills)}
-      <p id="profile-limit" class="mode-note" role="status"></p>
-      <label class="field">${t("想带进工作的爱好或自定义搜索词","Hobbies I want to use at work or custom search terms")}
-        <input type="text" id="keywords" data-profile="keywords" maxlength="100" value="${esc(profile.keywords)}"
-          placeholder="${t("例如摄影、零售数据分析","For example, photography or retail analytics")}"></label>
-      <p class="mode-note">${t("自定义词会带到最终页，供搜索招聘广告时参考。","Custom terms carry to the final page for searching job ads.")}</p>
-      ${rules.length ? `<div class="pathway-rules"><h3>${t("按工作任务找职业组","Find occupation groups by the work they do")}</h3>
-        <div class="pathway-rule-grid">${rules.map(rule=>`<article class="pathway-rule" data-rule="${esc(rule.id)}"><strong>${esc(rule.task)}</strong>
-          <p>${esc(list(rule.match))}</p>
-          <p>${t("岗位搜索词","Job-ad keywords")} · ${esc(rule.words)}</p>
-          <div class="chip-row" role="group" aria-label="${esc(rule.task)}">
-            ${rule.groups.map(group=>chip("taskOccupation",`${rule.id}|${group}`,label(group),state.taskOccupations[rule.id]===group)).join("")}</div>
-        </article>`).join("")}</div>
-        <p class="mode-note">${t("每项任务可独立选一个职业组，热力表会合并同名职业组。实际职业分类取决于岗位职责。",
-          "Choose one occupation per task. The heatmap combines duplicate groups. Actual classification depends on job duties.")}</p>
-        <a class="secondary-link" href="#hiring" data-scroll="hiring">${t("查看招聘热力表","Go to the vacancy heatmap")} ↓</a></div>` : ""}
-      </section>`;
+    return `<section class="profile-quiz card" id="profile-card" aria-labelledby="profile-heading">
+      <div class="quiz" data-quiz>
+        <div class="quiz-head">
+          <div class="quiz-progress" aria-hidden="true"><i data-quiz-bar></i></div>
+          <span class="quiz-count" data-quiz-count></span>
+        </div>
+        <div class="quiz-stage" data-quiz-stage></div>
+      </div>
+    </section>`;
+  }
+  let quizIndex=-1, quizSteps=buildQuizSteps(), quizTimer=null;
+  const quizStage = ()=>main.querySelector("[data-quiz-stage]");
+  function clearQuizTimer(){ if(quizTimer){clearTimeout(quizTimer);quizTimer=null;} }
+  function setQuizBar() {
+    const bar=main.querySelector("[data-quiz-bar]"), count=main.querySelector("[data-quiz-count]");
+    const total=quizSteps.length; let pct=0, text="";
+    if(quizIndex>=0&&quizIndex<total){ pct=quizIndex/total*100; text=t(`第 ${quizIndex+1} / ${total} 题`,`Q ${quizIndex+1} / ${total}`); }
+    else if(quizIndex>=total){ pct=100; text=t("结果","Result"); }
+    if(bar)bar.style.width=pct+"%";
+    if(count)count.textContent=text;
+  }
+  function switchPane(html) {
+    const stage=quizStage(); if(!stage)return;
+    stage.innerHTML=html;
+    const pane=stage.querySelector(".q-pane");
+    if(pane){ pane.classList.add("q-enter"); requestAnimationFrame(()=>pane.classList.remove("q-enter")); }
+  }
+  function coverPane() {
+    return `<div class="q-pane q-cover">
+      <div class="q-cover-emoji">🧭</div>
+      <h2 id="profile-heading" class="q-cover-title">${t("测测你适合在香港做什么","Which Hong Kong career path fits you?")}</h2>
+      <p class="q-cover-sub">${t("用 4 个轻松的问题，看看你的专业、兴趣和技能对应哪些在招的职业方向。","Four light questions map your studies, interests and skills to hiring directions.")}</p>
+      <button type="button" class="q-primary" data-quiz-act="start">${t("开始测试","Start")}</button>
+      <div class="q-cover-actions">
+        <button type="button" class="q-ghost" data-quiz-act="example">${t("载入嘉宁的背景","Load Jia Ning's profile")}</button>
+        <button type="button" class="q-ghost" data-quiz-act="clear">${t("清空，浏览全部","Clear and browse all")}</button>
+      </div></div>`;
+  }
+  function questionPane(i) {
+    const step=quizSteps[i], profile=state.profile;
+    const chosen=step.kind==="single"?[profile[step.field]]:profile[step.field];
+    const body = step.kind==="text"
+      ? `<input type="text" class="q-text" data-quiz-input maxlength="100" value="${esc(profile[step.field])}" placeholder="${esc(step.placeholder)}">`
+      : `<div class="q-options${step.kind==="multi"?" q-multi":""}">${step.options.map(o=>{
+          const on=chosen.includes(o.value);
+          return `<button type="button" class="q-option${on?" on":""}" data-quiz-act="answer" data-value="${esc(o.value)}">
+            <span class="q-option-icon">${o.icon}</span><span class="q-option-label">${esc(o.label)}</span>
+            <span class="q-option-check">${on?"✓":""}</span></button>`;
+        }).join("")}</div>`;
+    const isLastText=step.kind==="text"&&i===quizSteps.length-1;
+    const foot=`<div class="q-foot">
+      ${i>0?`<button type="button" class="q-ghost" data-quiz-act="back">${t("上一题","Back")}</button>`:"<span></span>"}
+      ${isLastText
+        ?`<button type="button" class="q-primary q-small" data-quiz-act="continue">${t("查看结果","See my result")}</button>`
+        :step.optional?`<button type="button" class="q-ghost" data-quiz-act="skip">${t("跳过","Skip")}</button>`
+        :`<button type="button" class="q-primary q-small" data-quiz-act="continue">${t("继续","Next")}</button>`}</div>`;
+    return `<div class="q-pane q-question">
+      <p class="q-ask">${t(step.question[0],step.question[1])}${step.max?t(`（最多 ${step.max} 项）`,` (up to ${step.max})`):""}</p>
+      ${body}${foot}</div>`;
+  }
+  function analyzingPane() {
+    return `<div class="q-pane q-analyzing"><div class="q-dots"><i></i><i></i><i></i></div>
+      <p>${t("正在分析你的方向…","Analyzing your direction…")}</p></div>`;
+  }
+  function resultPane() {
+    const suggestions=pathway.suggestions(state.profile), top=suggestions[0];
+    const arch=top?archetypeMap[top.id]:openArchetype;
+    const groupChips=top?top.groups.map(g=>`<button type="button" class="q-group" data-quiz-act="group" data-value="${esc(g)}">${esc(label(g))}</button>`).join(""):"";
+    const other=suggestions.slice(1,4).map(s=>{const a=archetypeMap[s.id];
+      return `<button type="button" class="q-other" data-quiz-act="peek" data-value="${esc(s.id)}"><span>${a.emoji}</span>${esc(t(...a.name))}<b>${s.match.length}</b></button>`;
+    }).join("");
+    return `<div class="q-pane q-result">
+      <div class="q-result-emoji">${arch.emoji}</div>
+      <h3 class="q-result-name">${esc(t(...arch.name))}</h3>
+      <p class="q-result-desc">${esc(t(...arch.desc))}</p>
+      ${top?`<div class="q-result-block"><p class="q-block-label">${t("匹配的职业组","Matching occupation groups")}</p>
+        <div class="q-group-row">${groupChips}</div>
+        <p class="q-words">${t("岗位搜索词","Job-ad keywords")}：${esc(top.words)}</p></div>`:""}
+      ${other?`<div class="q-result-other"><p class="q-block-label">${t("你也可能适合","You may also fit")}</p>${other}</div>`:""}
+      <div class="q-result-actions">
+        <button type="button" class="q-primary" data-quiz-act="view">${t("查看相关空缺","View related vacancies")}</button>
+        <button type="button" class="q-ghost" data-quiz-act="restart">${t("重新测一次","Retake")}</button></div></div>`;
+  }
+  function renderQuiz() {
+    const total=quizSteps.length;
+    if(quizIndex===-1)switchPane(coverPane());
+    else if(quizIndex<total)switchPane(questionPane(quizIndex));
+    else if(quizIndex===total)switchPane(analyzingPane());
+    else switchPane(resultPane());
+    setQuizBar();
+  }
+  function go(i){ quizIndex=i; renderQuiz(); }
+  function analyzeThenResult(){ clearQuizTimer(); go(quizSteps.length); quizTimer=setTimeout(()=>go(quizSteps.length+1),1300); }
+  function initQuiz(){ clearQuizTimer(); quizSteps=buildQuizSteps(); quizIndex=-1; renderQuiz(); }
+  function handleQuiz(e,el) {
+    const act=el.dataset.quizAct, total=quizSteps.length;
+    if(act==="start")go(0);
+    else if(act==="restart"){ state.profile=pathway.emptyProfile(); go(-1); }
+    else if(act==="clear"){ state.profile=pathway.emptyProfile(); go(total+1); }
+    else if(act==="example"){ loadExampleProfile(); analyzeThenResult(); }
+    else if(act==="back")go(Math.max(0,quizIndex-1));
+    else if(act==="skip"||act==="continue"){
+      if(quizIndex===total-1)analyzeThenResult(); else go(quizIndex+1);
+    }
+    else if(act==="answer"){
+      const step=quizSteps[quizIndex], v=el.dataset.value;
+      if(step.kind==="single"){
+        state.profile[step.field]=v;
+        switchPane(questionPane(quizIndex));
+        clearQuizTimer();
+        quizTimer=setTimeout(()=>{ if(quizIndex===total-1)analyzeThenResult(); else go(quizIndex+1); },300);
+      } else {
+        const arr=state.profile[step.field];
+        if(arr.includes(v))arr.splice(arr.indexOf(v),1);
+        else if(arr.length<step.max)arr.push(v);
+        else { const st=quizStage();st.classList.add("q-shake");setTimeout(()=>st.classList.remove("q-shake"),320);return; }
+        switchPane(questionPane(quizIndex));
+      }
+    }
+    else if(act==="view"||act==="group"){
+      let occ;
+      if(act==="group")occ=el.dataset.value;
+      else occ=pathway.suggestions(state.profile)[0]?.groups[0];
+      if(occ)state.occupations=occ;
+      clearQuizTimer(); render(); $("hiring").scrollIntoView({block:"start"});
+    }
+    else if(act==="peek"){
+      // 把该方向临时置顶展示：用其 archetype 弹出轻量提示
+      const a=archetypeMap[el.dataset.value];
+      const tip=t(...a.name)+" · "+t(...a.desc);
+      tooltip.textContent=tip; tooltip.hidden=false;
+      const r=el.getBoundingClientRect();
+      tooltip.style.left=Math.min(window.innerWidth-220,r.left)+"px";
+      tooltip.style.top=Math.max(8,r.top-10)+"px";
+    }
+  }
+  function sankeyChart() {
+    const selInds = new Set(visibleIndustries());
+    const occActive = pathway.occupationGroups.includes(state.occupations) ? state.occupations : "";
+    const cell = state.vacancyCell || "";
+    const isEn = language.code() === "en";
+    const indShortEn = {
+      "制造业": "Manufacturing", "进出口及批发": "Import/export & wholesale", "零售业": "Retail trade",
+      "运输及邮政": "Transport & postal", "住宿及餐饮": "Accommodation & food", "资讯及通讯": "Info & comms",
+      "金融及保险": "Financing & insurance", "地产业": "Real estate",
+      "专业及商业服务": "Prof. & business services", "社会及个人服务": "Social & personal services",
+    };
+
+    const left = d.demand.map(ind => {
+      const rows = d.occupations.filter(o => o.id === ind.id);
+      const total = rows.reduce((s, r) => s + (r.count || 0), 0);
+      return { id: ind.id, zh: ind.name, en: indShortEn[ind.name] || englishName(ind.name), name: label(ind.name), market: ind, total, rows };
+    }).sort((a, b) => b.total - a.total);
+    const right = pathway.occupationGroups.map(g => {
+      const rows = d.occupations.filter(o => o.name === g);
+      const total = rows.reduce((s, r) => s + (r.count || 0), 0);
+      return { name: g, zh: aliases[g] ?? g, en: occShortEn[g] || g, total, rows };
+    }).sort((a, b) => b.total - a.total);
+
+    const links = [];
+    left.forEach(L => L.rows.forEach(r => {
+      if ((r.count || 0) > 0) links.push({ ind: L.id, indName: L.name, occ: r.name, count: r.count, share: r.share });
+    }));
+    left.forEach((n, i) => { n.color = colors[i % colors.length]; });
+
+    const SW = 1200, SH = 720, padT = 30, padB = 26, gapL = 12, gapR = 10;
+    const totalAll = left.reduce((s, n) => s + n.total, 0);
+    const availH = SH - padT - padB;
+    const scaleY = (availH - gapL * (left.length - 1)) / totalAll;
+    let y = padT;
+    left.forEach(n => { n.h = Math.max(n.total * scaleY, 3); n.y0 = y; n.y1 = y + n.h; y = n.y1 + gapL; });
+    y = padT;
+    right.forEach(n => { n.h = Math.max(n.total * scaleY, 3); n.y0 = y; n.y1 = y + n.h; y = n.y1 + gapR; });
+    let prev = padT - 30;
+    left.forEach(n => { n.labelY = Math.max((n.y0 + n.y1) / 2, prev + 30); prev = n.labelY; });
+    prev = padT - 30;
+    right.forEach(n => { n.labelY = Math.max((n.y0 + n.y1) / 2, prev + 30); prev = n.labelY; });
+
+    left.forEach(L => {
+      let cy = L.y0;
+      right.forEach(R => {
+        const l = links.find(x => x.ind === L.id && x.occ === R.name);
+        if (l) { const h = Math.max(l.count * scaleY, 1); l.ly0 = cy; l.ly1 = cy + h; cy += h; }
+      });
+    });
+    right.forEach(R => {
+      let cy = R.y0;
+      left.forEach(L => {
+        const l = links.find(x => x.ind === L.id && x.occ === R.name);
+        if (l) { const h = Math.max(l.count * scaleY, 1); l.ry0 = cy; l.ry1 = cy + h; cy += h; }
+      });
+    });
+
+    const xL = 180, xR = 1010, nodeW = 10, xMid = (xL + xR) / 2;
+    const nameFs = isEn ? 11.5 : 12.5;
+    const linkPath = l =>
+      `M ${xL} ${l.ly0} C ${xMid} ${l.ly0}, ${xMid} ${l.ry0}, ${xR} ${l.ry0} L ${xR} ${l.ry1} C ${xMid} ${l.ry1}, ${xMid} ${l.ly1}, ${xL} ${l.ly1} Z`;
+
+    const occTotal = name => {
+      const rows = d.occupations.filter(o => o.name === name);
+      return selInds.size === 0
+        ? rows.reduce((s, r) => s + (r.count || 0), 0)
+        : rows.filter(r => selInds.has(r.id)).reduce((s, r) => s + (r.count || 0), 0);
+    };
+
+    const filtering = selInds.size > 0 || occActive;
+    let content = "";
+    content += `<text x="${xL}" y="16" fill="var(--faint)" font-size="11" letter-spacing=".08em">${esc(t("行业", "Industry"))}</text>`;
+    content += `<text x="${xR + nodeW + 10}" y="16" fill="var(--faint)" font-size="11" letter-spacing=".08em">${esc(t("职业组", "Occupation group"))}</text>`;
+
+    links.forEach(l => {
+      const indOk = selInds.size === 0 || selInds.has(l.ind);
+      const occOk = !occActive || l.occ === occActive;
+      const active = indOk && occOk;
+      const op = !filtering ? ".22" : active ? ".55" : ".05";
+      const key = pathway.pairKey(l.ind, l.occ);
+      const tip = `${l.indName} → ${label(l.occ)}\n${t("空缺", "Vacancies")} ${number(l.count)} · ${t("行业内占比", "within-industry share")} ${percent(l.share * 100)}`;
+      const m = c.mark(tip, "vacancyCell", key, cell === key, "vacancyCell:" + key);
+      content += `<path d="${linkPath(l)}" fill="${left.find(n => n.id === l.ind).color}" fill-opacity="${op}" data-op="${op}" ${m}/>`;
+    });
+
+    left.forEach(n => {
+      const on = selInds.has(n.id);
+      const dim = selInds.size > 0 && !on;
+      const tip = `${n.name}\n${t("空缺", "Vacancies")} ${number(n.total)} · ${t("空缺率", "Vacancy rate")} ${percent(n.market.rate * 100)}`;
+      const m = c.mark(tip, "bubble", n.id, on, "bubble:" + n.id);
+      content += `<g ${m} style="opacity:${dim ? ".35" : "1"};cursor:pointer">
+        <rect x="${xL}" y="${n.y0}" width="${nodeW}" height="${Math.max(n.h, 3)}" fill="${n.color}"/>
+        <text x="${xL - 10}" y="${n.labelY - 2}" text-anchor="end" fill="var(--ink)" font-weight="680" font-size="${nameFs}" stroke="none">${esc(t(n.zh, n.en))}</text>
+        <text x="${xL - 10}" y="${n.labelY + 13}" text-anchor="end" fill="var(--muted)" font-size="11" stroke="none" style="font-variant-numeric:tabular-nums">${number(n.total)}</text></g>`;
+    });
+
+    right.forEach(n => {
+      const on = occActive === n.name;
+      const dim = occActive && !on;
+      const tip = `${label(n.name)} · ${number(occTotal(n.name))}`;
+      const m = c.mark(tip, "sankeyOcc", n.name, on, "sankeyOcc:" + n.name);
+      content += `<g ${m} style="opacity:${dim ? ".35" : "1"};cursor:pointer">
+        <rect x="${xR}" y="${n.y0}" width="${nodeW}" height="${Math.max(n.h, 3)}" fill="#3a3552"/>
+        <text x="${xR + nodeW + 10}" y="${n.labelY - 2}" fill="var(--ink)" font-weight="680" font-size="${nameFs}" stroke="none">${esc(t(n.zh, n.en))}</text>
+        <text x="${xR + nodeW + 10}" y="${n.labelY + 13}" fill="var(--muted)" font-size="11" stroke="none" style="font-variant-numeric:tabular-nums">${number(occTotal(n.name))}</text></g>`;
+    });
+
+    return `<svg viewBox="0 0 ${SW} ${SH}" role="img" style="width:100%;height:auto;display:block;overflow:visible" aria-label="${esc(t("行业到职业组的空缺流向桑基图", "Sankey of vacancies from industries to occupation groups"))}">${content}</svg>`;
   }
 
   function vacancyPanel(taskGroups) {
     const picked = visibleIndustries();
-    const {vacancyMode:mode,vacancyCell:cell,occupations} = state;
-    const chosen = d.demand.filter(r=>!picked.length||picked.includes(r.id));
+    const {vacancyCell:cell,occupations} = state;
     const scope = occupations==="tasks" && !taskGroups.size ? "all" : occupations;
     const groups = pathway.occupationGroups.filter(name =>
       scope==="all" || scope===name || (scope==="tasks" && taskGroups.has(name)));
     const occupationScopes = taskGroups.size ? ["tasks","all",...pathway.occupationGroups] : ["all",...pathway.occupationGroups];
-    const demandLabels = groups.map(name=>({name:label(name),key:name}));
-    const maxCount = Math.max(1,...d.occupations.map(row=>row.count ?? 0));
-    const isCount = mode==="count";
-    const heat = heatTable(demandLabels,chosen.map(r=>({id:r.id,name:label(r.name)})),
-      (occupation,id)=>pathway.findVacancy(id,occupation)?.[mode],
-      (v,occupation,industry)=>{
-        const key = pathway.pairKey(industry.id,occupation.key);
-        return {text:isCount?number(v):percent(v*100),opacity:.12+.66*Math.sqrt(v/(isCount?maxCount:1)),
-          action:"vacancyCell",key,selected:key===cell};
-      },
-      t("职业组","Occupation"),t("行业职业空缺热力图","Vacancy heatmap by industry and occupation"));
     const [activeId,activeGroup] = cell.split("|");
-    const isVisible = chosen.some(row=>row.id===activeId) && groups.includes(activeGroup);
+    const isVisible = d.demand.some(row=>row.id===activeId) && groups.includes(activeGroup);
     const active = isVisible && pathway.findVacancy(activeId,activeGroup);
     const market = d.demand.find(row=>row.id===activeId);
     const alreadyAdded = state.pairs.some(pair=>keyOf(pair)===cell);
@@ -445,18 +726,14 @@
         if(v==="tasks") return t("任务卡所选职业组","Groups selected on task cards");
         return v==="all"?t("全部职业","All occupations"):label(v);
       },scope))}
-      ${hint("招聘空缺按行业大类统计。选择细分行业会突出所属大类，并把细分范围带到 02 页试算。",
-        "Vacancies are reported by broad industry. Selecting a detailed industry focuses its parent group and carries the detailed selection into chapter 02.")}
-      ${grid(
-        figure("map",t("招聘机会地图","Hiring opportunities"),t("2026Q2 · 横轴空缺率 · 纵轴用工同比","2026 Q2 · Vacancy rate (x) · Employment change year on year (y)"),
-          viz("map-bubbles",w=>c.bubbles(w,d.demand.map(r=>({...r,name:label(r.name)})),picked)),
-          t("圆面积表示空缺人数。横虚线表示用工同比 0%，竖虚线表示调查总体空缺率 1.7%。点气泡筛选热力表，Ctrl／⌘ 可多选。",
-            "Bubble area shows vacancy count. The horizontal line marks zero growth. The vertical line marks the survey-wide vacancy rate of 1.7%. Select a bubble to filter the heatmap. Ctrl/Cmd-click toggles additional industries."),
-          {key:legend([[t("用工增加","Employment up"),purple],[t("用工减少","Employment down"),rose]])}),
-        figure("vacancies",t("行业 × 职业空缺","Vacancies by industry and occupation"),t("2026Q2 · 行业大类与九个职业组","2026 Q2 · Broad industries and nine occupation groups"),
-          heat,t("点格子查看职业组的空缺数和行业内占比，再把这个组合加入比较，或单独筛选该行业。",
-            "Select a cell to see the occupation’s vacancy count and share. You can then add the pair to your comparison or filter to its industry."),
-          {control:select("vacancyMode",t("单元格显示","Show in cells"),["count","share"],v=>v==="count"?t("空缺人数","Vacancy count"):t("行业内占比","Share within industry"))}))}
+      ${hint("招聘空缺按行业大类统计。点左侧行业单选，按住 ⌘/Ctrl 多选；点右侧职业组反查；点流带查看该行业×职业组合，可加入比较并带到 02 页试算。",
+        "Vacancies are reported by broad industry. Click an industry to select; hold ⌘/Ctrl to multi-select. Click an occupation group to filter; click a band to inspect an industry×occupation pair and add it to your comparison for chapter 02.")}
+      ${figure("sankey",t("行业 × 职业空缺流向","Vacancy flow: industry to occupation"),
+        t("2026Q2 · 流带宽度代表空缺人数","2026 Q2 · Band width shows vacancy count"),
+        viz("sankey",()=>sankeyChart()),
+        t("流带从左侧行业流向右侧职业组，带宽为该组合空缺人数；选中行业后，右侧职业人数按所选行业子集重算。",
+          "Bands flow from industries on the left to occupation groups on the right; width shows vacancy count. Right-side occupation totals recompute for the selected industries."),
+        {full:true})}
       <div class="decision evidence" aria-live="polite">
         ${active && market ? `<strong>${esc(pairTitle({id:activeId,occupation:activeGroup}))}</strong>
           <p>${number(active.count)} ${t("个职业组空缺","vacancies in this occupation group")} · ${vacancyShare(active)}
@@ -464,7 +741,7 @@
           <div class="chip-row">
             ${alreadyAdded ? `<span class="good">${t("已加入比较","In your comparison")}</span>` : chip("addPair",cell,t("加入比较","Add to comparison"))}
             ${picked.length===1 ? "" : chip("focusIndustry",activeId,t("筛选此行业","Filter to this industry"))}</div>`
-          : `<p>${t("点一个热力格查看招聘证据。","Select a heatmap cell to inspect the hiring evidence.")}</p>`}
+          : `<p>${t("点一条流带查看招聘证据。","Select a band to inspect the hiring evidence.")}</p>`}
       </div></section>`;
   }
 
@@ -541,23 +818,34 @@
   function shortlistTable(options) {
     const conditionLabel = segment => segment.match ? t("三项达标","Meets all three criteria")
       : segment.missing ? t("待补资料","Data needed") : t("未达条件","Below criteria");
+    const maxCount = Math.max(1,...options.map(o=>o.vacancy.count??0));
+    const surplusVals = options.flatMap(o=>o.segments.map(s=>s.surplus)).filter(Number.isFinite);
+    const surplusScale = Math.max(1,...surplusVals,state.targetSurplus);
+    const barPct = (v,max)=>Math.max(0,Math.min(100,Math.round(v/max*100)));
     return `<div class="table-scroll" tabindex="0" aria-label="${t("候选方向对照，可横向滚动","Shortlist comparison, scrolls horizontally")}">
-      <table class="compact-table"><thead><tr>
+      <table class="compact-table viz-table"><thead><tr>
         <th scope="col">${t("行业 × 职业组","Industry × occupation")}</th>
         <th scope="col">${t("职业组空缺<br>数量／行业内占比","Occupation vacancies<br>Count / industry share")}</th>
         <th scope="col">${t("细分行业 P50<br>月薪／周工时","Industry-segment medians<br>Pay / weekly hours")}</th>
-        <th scope="col">${t("估算月结余","Estimated monthly surplus")}</th>
+        <th scope="col">${t("估算月结余<br>条长＝相对目标","Estimated surplus<br>Bar vs target")}</th>
         <th scope="col" class="status-cell">${t("生活条件与个人线索","Criteria and personal rationale")}</th></tr></thead>
       <tbody>${options.map(option=>{
         const {pair,vacancy,market,segments,match,missing} = option;
         const multiple = segments.length>1;
         return `<tr data-pair="${esc(keyOf(pair))}"><th scope="row">${esc(pairTitle(pair))}</th>
-          <td>${number(vacancy.count)} / ${vacancyShare(vacancy)}
+          <td><div class="cell-num">${number(vacancy.count)} <span class="cell-share">/ ${vacancyShare(vacancy)}</span></div>
+            <div class="mini-bar"><i style="width:${barPct(vacancy.count??0,maxCount)}%"></i></div>
             <span class="subcell">${market.period}</span></td>
           <td>${segments.flatMap(segment=>[multiple ? `<span class="subcell">${esc(label(segment.name))}</span>` : "",
-            `<div>${money(segment.pay50)} / ${number(segment.hours50)} ${t("小时","h")}</div>`]).join("") || "—"}</td>
-          <td>${segments.map(segment=>`<div>${multiple ? `<span class="subcell">${esc(label(segment.name))}</span>` : ""}
-            ${money(segment.surplus)}</div>`).join("") || "—"}</td>
+            `<div class="cell-num">${money(segment.pay50)} <span class="cell-share">/ ${number(segment.hours50)} ${t("小时","h")}</span></div>`]).join("") || "—"}</td>
+          <td>${segments.map(segment=>{
+            if(!Number.isFinite(segment.surplus)) return `<div class="cell-num">—</div>`;
+            return `<div class="surplus-row${multiple?" multi":""}">
+              ${multiple?`<span class="subcell">${esc(label(segment.name))}</span>`:""}
+              <div class="surplus-num">${money(segment.surplus)}</div>
+              <div class="surplus-bar"><i class="${segment.match?"is-good":"is-bad"}" style="width:${barPct(segment.surplus,surplusScale)}%"></i></div>
+            </div>`;
+          }).join("") || "—"}</td>
           <td class="status-cell"><strong class="${match?"good":"check"}">
             ${match?(multiple?t("有细分行业达标","One or more segments meet criteria"):t("三项达标","Meets all three criteria"))
               :missing?t("待补资料","Data needed"):t("未达条件","Below criteria")}</strong>
@@ -590,26 +878,12 @@
   }
 
   function industryFilters() {
-    const detailed = segmentsFor(state.selected).map(row=>[row.name,label(row.name)]);
     const broad = d.demand.map(row=>[row.id,label(row.name)]);
     const visible = visibleIndustries();
-    const menu = (key,title,options) => {
-      const selected = state[key];
-      const summary = selected.length?t(`已选 ${selected.length} 项`,`${selected.length} selected`):t("全部","All");
-      return `<details class="filter-menu" id="${key}-menu" data-persist-open><summary>${title} · ${summary}</summary>
-        <div class="filter-panel"><div class="chip-row">
-          ${chip("setIndustryFilter",key+"|all",t("全选","Select all"))}
-          ${chip("setIndustryFilter",key+"|clear",t("清除筛选","Clear filter"))}
-        </div><fieldset aria-label="${title}">${options.map(([id,name])=>`<label>
-          <input type="checkbox" data-industry-filter="${key}" data-focus="${esc(key+":"+id)}" value="${esc(id)}"${selected.includes(id)?" checked":""}>
-          <span>${esc(name)}</span></label>`).join("")}</fieldset></div></details>`;
-    };
-    return select("hiringIndustry",t("单选行业","Select one industry"),
+    return select("hiringIndustry",t("快速选一个行业","Quick pick (one industry)"),
       visible.length>1?["all","multiple",...broad.map(([id])=>id)]:["all",...broad.map(([id])=>id)],
       id=>id==="all"?t("全部行业","All industries"):id==="multiple"?t("已多选行业","Multiple industries selected"):industryName(id),
       visible.length>1?"multiple":visible[0]??"all")
-      + menu("selected",t("行业大类","Broad industry"),broad)
-      + menu("industryDetails",t("细分行业","Detailed industry"),detailed)
       + (hasIndustryFilter()?chip("resetIndustryFilters","all",t("恢复全部行业","Show all industries")):"");
   }
 
@@ -645,10 +919,6 @@
         .sort((a,b)=>a[0]-b[0]);
       return lineSet(label(industry.name),data,colors[i%colors.length],i%3===1);
     });
-    const hValues = history.flatMap(s=>s.points.map(p=>p[1])).filter(Number.isFinite);
-    const histMin = Math.floor(Math.min(100,...hValues)/10)*10;
-    const histMax = Math.ceil(Math.max(110,...hValues)/10)*10;
-    const histYears = span(state.startYear,Math.floor(end)).filter((y,i,a)=>a.length<=6||i%2===0||i===a.length-1);
     const status = matched.length ? t("优先查证","Investigate first")+" · "+list(matched.map(option=>pairTitle(option.pair)))
       : !confirmed.length ? t("从 01 页确认方向后，候选表就会生成。","Confirm options in chapter 01 to populate your shortlist.")
       : !ranked.length ? t("当前筛选范围内没有已确认方向。","No confirmed options in the current filters.")
@@ -699,12 +969,11 @@
           +viz("budget-waterfall",w=>c.waterfall(w,state)),
           t("从 Offer 月薪扣去三项开支。预留扣款由你填写；可把预计税款和强积金统一填入，实际金额以适用规定和合约为准。",
             "The budget subtracts three expenses from the assumed offer. Enter your own allowance for items such as tax and MPF. Actual deductions depend on the applicable rules and contract."))
-      + figure("history",t("行业用工走势","Employment trends by industry"),t("季度 · 以 2016Q1 为 100","Quarterly index · 2016 Q1 = 100"),
-          series("history-line",history,{x:[state.startYear,end],xTicks:histYears,y:[histMin,histMax],refY:100,
-            xFormat:String,label:t("所选行业季度用工指数折线图","Quarterly employment index for selected industries")}),
-          t("指数是当季就业人数除以该行业 2016Q1 人数后乘 100。选择起始年只缩短展示范围，基期保持原值。线条描述行业规模，无法估计个人失业风险。",
-            "The index divides employment in each quarter by that industry’s 2016 Q1 count and multiplies by 100. Changing the start year changes only the viewing window. The lines describe industry employment levels."),
-          {control:select("startYear",t("历史起始年","History start year"),span(2016,2025)),key:legend(history.map(s=>[s.name,s.color]))})
+      + figure("history",t("哪些行业用工在扩张？","Where is industry employment growing?"),t("季度指数 · 以 2016Q1 为 100 · 按累计变化排序","Quarterly index · 2016 Q1 = 100 · sorted by total change"),
+          viz("history-opportunity",w=>c.opportunity(w,history)),
+          t("条形方向和长度表示该行业从起始年到最新季度的用工累计变化：向右绿色为扩张、向左红色为收缩，旁边的迷你走势展示完整过程。用工扩张通常意味着岗位更活跃，但不能据此估计个人失业风险。",
+            "Bars show each industry’s cumulative change from the start year to the latest quarter: green to the right is growth, red to the left is contraction, with a sparkline showing the full path. Growing employment usually means more active hiring, but it does not estimate personal unemployment risk."),
+          {control:select("startYear",t("历史起始年","History start year"),span(2016,2025))})
       + `</div></section><section aria-labelledby="shortlist-heading"><header class="subhead"><h2 id="shortlist-heading">${t("哪些方向值得优先查证？","Which options should I investigate first?")}</h2></header>`
       + grid(
         figure("candidates",t("候选方向对照","Shortlist comparison"),t("三项门槛都达到的方向排在前面","Options that meet all three criteria appear first"),
@@ -751,8 +1020,8 @@
         ". The demand snapshot is 2026 Q2 and covers surveyed industries, excluding civil servants.")}</li>
       <li>${hk("220-23015","全职月薪分布","Full-time monthly pay distribution")} · ${hk("220-23034","全职工时分布","Full-time working hours distribution")}${t("。采用 2016–2025 年各年 5–6 月数据。大类和细分行业对应关系见项目数据说明。",
         ". These use May–June observations for 2016–2025. The project notes explain the mappings between broad industries and detailed segments.")}</li>
-      <li>${t("行业空缺率以就业人数加空缺人数为分母。热力表的职业组占比以所在行业的全部空缺为分母。",
-        "The industry vacancy rate divides vacancies by employment plus vacancies. The heatmap divides each occupation’s vacancies by all vacancies in its industry.")}</li>
+      <li>${t("行业空缺率以就业人数加空缺人数为分母。流向图中职业组占比以所在行业的全部空缺为分母。",
+        "The industry vacancy rate divides vacancies by employment plus vacancies. The flow chart divides each occupation’s vacancies by all vacancies in its industry.")}</li>
       <li>${t("考察细分行业时使用 P50。同一个组合有多个细分行业，可以逐项查看。达标项优先，同组内可按估算结余或职业组空缺数排序，缺资料项排后。",
         "Each segment is assessed at P50. Expand a pair to inspect its segments. Options meeting the criteria appear first. Sort within each outcome by estimated surplus or vacancy count. Options with missing evidence appear last.")}</li>
       <li>${t("专业、兴趣和技能通过项目整理的工作任务规则提供探索线索。候选组合由用户确认，信息保存在当前浏览器标签页的会话内。",
@@ -788,6 +1057,88 @@
     $("footer-sources").textContent = t("数据来源与使用说明","Data sources and notes");
   }
 
+  function animateNumbers() {
+    main.querySelectorAll(".stats .stat strong").forEach(el=>{
+      const raw = el.textContent;
+      const m = raw.match(/([\d,]+\.?\d*)/);
+      if (!m) return;
+      const target = parseFloat(m[1].replace(/,/g,""));
+      if (!Number.isFinite(target) || target === 0) return;
+      const decimals = (m[1].split(".")[1] || "").length;
+      const prefix = raw.slice(0, m.index), suffix = raw.slice(m.index + m[1].length);
+      const dur = 620, t0 = performance.now();
+      const frame = now => {
+        const p = Math.min(1, (now - t0) / dur);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = prefix + (target * eased).toLocaleString("en-US",
+          { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+        if (p < 1) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function toggleCross(next) {
+    const cur = state.cross;
+    state.cross = (cur && cur.kind===next.kind && String(cur.key)===String(next.key)) ? null : next;
+  }
+  function applyCross() {
+    main.querySelectorAll(".is-dim,.is-hl").forEach(el=>el.classList.remove("is-dim","is-hl"));
+    const cross = state.cross;
+    if(!cross) return;
+    const focused = state.overviewIndustry!==null && state.overviewIndustry!==undefined;
+    const lineGroups = [...main.querySelectorAll("#employment .series-g")];
+    const bandEls = [...main.querySelectorAll("#industry .stack-band, #industry .stack-line")];
+    const tiles = [...main.querySelectorAll("#occupation .tree-tile")];
+    const slices = [...main.querySelectorAll("#employment-status .donut-slice, #employment-status .donut-legend li")];
+    if(cross.kind==="status") {
+      slices.forEach(el=>el.classList.add(el.dataset.status===cross.key?"is-hl":"is-dim"));
+      return;
+    }
+    if(cross.kind==="occ") {
+      tiles.forEach(el=>el.classList.add(el.dataset.occ===cross.key?"is-hl":"is-dim"));
+      const bands = occTopBands(cross.key).map(String);
+      if(bands.length && !focused) {
+        lineGroups.forEach(g=>{if(g.dataset.ind!=="")g.classList.add(bands.includes(g.dataset.ind)?"is-hl":"is-dim");});
+        bandEls.forEach(el=>el.classList.add(bands.includes(el.dataset.ind)?"is-hl":"is-dim"));
+      }
+      return;
+    }
+    if(cross.kind==="ind") {
+      const key=String(cross.key);
+      if(!focused) {
+        lineGroups.forEach(g=>{if(g.dataset.ind!=="")g.classList.add(g.dataset.ind===key?"is-hl":"is-dim");});
+        bandEls.forEach(el=>el.classList.add(el.dataset.ind===key?"is-hl":"is-dim"));
+      }
+      const occs = bandTopOccs(cross.key);
+      if(occs.length) tiles.forEach(el=>el.classList.add(occs.includes(el.dataset.occ)?"is-hl":"is-dim"));
+    }
+  }
+  function crossBanner() {
+    const cross=state.cross;
+    if(!cross) return "";
+    const bandNames=[...new Set(d.structure.filter(r=>r.kind==="industry_share").map(r=>r.name))];
+    let tag, text;
+    if(cross.kind==="occ") {
+      const names=occToInds(cross.key).slice(0,3).map(ind=>{
+        const row=d.demand.find(r=>r.id===ind);
+        return row?label(row.name):ind;
+      });
+      tag=label(cross.key);
+      text=t(`空缺主要集中在 ${names.join("、")}；旁边行业图已同步高亮。`,
+        `Vacancies concentrate in ${names.join(", ")}; the industry charts are highlighted.`);
+    } else if(cross.kind==="ind") {
+      const names=bandTopOccs(cross.key).map(o=>label(o));
+      tag=label(bandNames[cross.key]);
+      text=t(`该行业空缺主要对应这些职业组：${names.join("、")}；职业构成图已同步高亮。`,
+        `Vacancies here mainly map to: ${names.join(", ")}; the occupation chart is highlighted.`);
+    } else {
+      tag=label(cross.key);
+      text=t("已选中该身份，其余身份已变淡；身份与行业/职业没有交叉口径，故仅在本图高亮。",
+        "This status is selected and others are dimmed. No cross-tab with industry or occupation exists, so only this chart highlights.");
+    }
+    return `<div class="cross-banner" role="status"><span class="cross-tag">${esc(tag)}</span><span class="cross-text">${esc(text)}</span><button type="button" data-action="clearCross">${t("清除联动","Clear")}</button></div>`;
+  }
   function render(focusKey) {
     pathway.save(state);
     for(const details of main.querySelectorAll("details[data-persist-open]")) {
@@ -822,9 +1173,14 @@
     });
     const updated=focusKey && (document.getElementById(focusKey) || [...main.querySelectorAll("[data-focus]")].find(el=>el.dataset.focus===focusKey));
     if(updated) updated.focus({preventScroll:true});
+    animateNumbers();
+    applyCross();
+    if(main.querySelector("[data-quiz]")) initQuiz();
+    else clearQuizTimer();
   }
 
   function route() {
+    stopPlay();
     const id=location.hash.slice(1);
     if(id==="content") { main.focus(); return; }
     const anchors = new Map([
@@ -876,18 +1232,23 @@
       state.marketIndustry=wageAgeGroups[state.wageIndustry] ?? "";
     }
     if(key==="resetWageRate") state.wageRate=defaultWageRate;
+    if(key==="playTimeline") { togglePlay(); return; }
+    if(key==="clearCross") { state.cross=null; }
     if(key==="overviewYear") {
       const [year,industry] = value.split("|").map(Number);
       if (year<2016) return;
       state.overviewYear=year;
-      if (industry!==undefined) state.overviewIndustry=industry;
+      if (industry!==undefined) toggleCross({kind:"ind",key:industry});
     }
     if(key==="overviewBand") {
       const [index,year] = value.split("|").map(Number);
-      state.overviewIndustry=index;
       if(year>=2016) state.overviewYear=year;
+      toggleCross({kind:"ind",key:index});
     }
-    if(key==="overviewIndustry") state.overviewIndustry=value==="all"||state.overviewIndustry===+value?null:+value;
+    if(key==="overviewIndustry") {
+      state.overviewIndustry=value==="all"||state.overviewIndustry===+value?null:+value;
+      state.cross=null;
+    }
     if(key==="bubble") {
       setIndustryFilter(toggleIndustry(visibleIndustries(),value,e.ctrlKey||e.metaKey),[]);
     }
@@ -916,7 +1277,13 @@
         return;
       }
     }
+    if(key==="crossOcc") {
+      toggleCross({kind:"occ",key:value});
+      state.occupations=value;
+    }
+    if(key==="crossStatus") toggleCross({kind:"status",key:value});
     if(key==="occupationGroup") state.occupations=value;
+    if(key==="sankeyOcc") state.occupations = state.occupations===value ? "all" : value;
     if(key==="taskOccupation") {
       const [task,group] = value.split("|");
       if(state.taskOccupations[task]===group) delete state.taskOccupations[task];
@@ -950,10 +1317,11 @@
       : key==="focusIndustry" ? "vacancyCell:"+state.vacancyCell
       : key==="overviewBand" ? "overviewIndustry:industry:"+value.split("|")[0] : el.dataset.focus;
     render(focusKey);
-    if(key==="occupationGroup") $("hiring").scrollIntoView({block:"start"});
   }
 
   main.addEventListener("click",e=>{
+    const quizEl=e.target.closest("[data-quiz-act]");
+    if(quizEl){ handleQuiz(e,quizEl); pathway.save(state); return; }
     if(e.target.closest("[data-start-example]")) {
       loadExampleProfile();
       pathway.save(state);
@@ -976,9 +1344,13 @@
   main.addEventListener("keydown",e=>{
     const target=e.target.closest("svg [data-action]");
     if(target&&(e.key==="Enter"||e.key===" ")) { e.preventDefault(); action(e,target); }
-    if(e.key==="Escape") tooltip.hidden=true;
+    if(e.key==="Escape") {
+      tooltip.hidden=true;
+      if(state.cross) { state.cross=null; render(); }
+    }
   });
   main.addEventListener("change",e=>{
+    if(e.target.matches('input[data-range]')) { render(); return; }
     if(e.target.dataset.industryFilter) {
       const key=e.target.dataset.industryFilter;
       const next=toggleIndustry(state[key],e.target.value,true);
@@ -998,7 +1370,7 @@
     }
     const key=e.target.dataset.control;
     if(!key || e.target.type==="number") return;
-    if(key==="overviewIndustry") state.overviewIndustry=e.target.value==="all"?null:Number(e.target.value);
+    if(key==="overviewIndustry") { state.overviewIndustry=e.target.value==="all"?null:Number(e.target.value); state.cross=null; }
     else if(key==="hiringIndustry") {
       if(e.target.value==="multiple") return;
       setIndustryFilter(e.target.value==="all"?[]:[e.target.value],[]);
@@ -1011,7 +1383,48 @@
     } else state[key]=e.target.value;
     render(e.target.id);
   });
+  const budgetKeys = ["offer","rent","living","deduct"];
+  function updateBudgetLive() {
+    const wf = main.querySelector('[data-chart="budget-waterfall"]');
+    if (wf) {
+      const w = Math.floor(wf.clientWidth);
+      if (w > 0) wf.innerHTML = c.waterfall(w, state);
+    }
+    const strong = main.querySelectorAll(".stats .stat strong");
+    if (strong.length >= 3) strong[2].textContent = money(state.offer-state.rent-state.living-state.deduct);
+  }
+  function syncSliderFill(rangeEl, v) {
+    const rmin = Number(rangeEl.min), rmax = Number(rangeEl.max);
+    rangeEl.style.setProperty("--fill", Math.max(0, Math.min(100, (v-rmin)/(rmax-rmin)*100)) + "%");
+  }
   main.addEventListener("input",e=>{
+    const el = e.target;
+    if(el.matches('input[data-quiz-input]')) {
+      state.profile.keywords=el.value;
+      pathway.save(state);
+      return;
+    }
+    if(el.matches('input[data-range]')) {
+      const key = el.dataset.range, v = Number(el.value);
+      state[key] = v;
+      const cap = $("num-"+key); if (cap) cap.textContent = number(v);
+      const numInput = $(key); if (numInput) numInput.value = v;
+      syncSliderFill(el, v);
+      if (budgetKeys.includes(key)) updateBudgetLive();
+      pathway.save(state);
+      return;
+    }
+    if(el.matches('input.slider-number')) {
+      const key = el.dataset.control, v = Number(el.value);
+      if (!Number.isFinite(v)) return;
+      state[key] = v;
+      const range = main.querySelector(`input[data-range="${key}"]`);
+      if (range) { range.value = v; syncSliderFill(range, v); }
+      const cap = $("num-"+key); if (cap) cap.textContent = number(v);
+      if (budgetKeys.includes(key)) updateBudgetLive();
+      pathway.save(state);
+      return;
+    }
     if(e.target.id==="keywords") state.profile.keywords=e.target.value;
     else if(e.target.dataset.note) {
       const pair=state.pairs.find(pair=>keyOf(pair)===e.target.dataset.note);
@@ -1033,6 +1446,29 @@
     }
     render(e.submitter?.id);
   });
+  function positionTip(x,y) {
+    const padding=8;
+    tooltip.style.left=Math.max(padding,Math.min(x+12,innerWidth-tooltip.offsetWidth-padding))+"px";
+    tooltip.style.top=(y+tooltip.offsetHeight+14>innerHeight?Math.max(padding,y-tooltip.offsetHeight-10):y+12)+"px";
+  }
+  function highlightBand(band){
+    if(!band) return;
+    const svg=band.closest("svg");
+    if(!svg) return;
+    svg.querySelectorAll('path[data-action="vacancyCell"]').forEach(p=>{
+      p.setAttribute("fill-opacity", p===band ? ".6" : ".06");
+    });
+    hoverBand=band;
+  }
+  function restoreBands(){
+    if(hoverBand && !hoverBand.isConnected) hoverBand=null;
+    if(!hoverBand) return;
+    const svg=hoverBand.closest("svg");
+    if(svg) svg.querySelectorAll('path[data-action="vacancyCell"]').forEach(p=>{
+      p.setAttribute("fill-opacity", p.dataset.op || ".22");
+    });
+    hoverBand=null;
+  }
   function showTip(el,event) {
     if(!el) return;
     const rect=el.getBoundingClientRect();
@@ -1040,17 +1476,41 @@
     const y=event?.clientY ?? rect.bottom;
     tooltip.textContent=el.dataset.tip;
     tooltip.hidden=false;
-    const padding=8;
-    tooltip.style.left=Math.max(padding,Math.min(x+12,innerWidth-tooltip.offsetWidth-padding))+"px";
-    tooltip.style.top=(y+tooltip.offsetHeight+14>innerHeight?Math.max(padding,y-tooltip.offsetHeight-10):y+12)+"px";
+    positionTip(x,y);
+  }
+  function resetCross() {
+    main.querySelectorAll(".hover-cross.on").forEach(l=>l.classList.remove("on"));
+  }
+  function showCross(cap,event) {
+    const svgEl = cap.closest("svg");
+    const lineEl = svgEl.querySelector(".hover-cross");
+    if (lineEl) {
+      const x = cap.dataset.crossX;
+      lineEl.setAttribute("x1", x);
+      lineEl.setAttribute("x2", x);
+      lineEl.classList.add("on");
+    }
+    tooltip.textContent = cap.dataset.crossTip;
+    tooltip.hidden = false;
+    positionTip(event.clientX, event.clientY);
   }
   main.addEventListener("pointermove",e=>{
+    const cap = e.target.closest(".x-capture");
+    if (cap) { restoreBands(); showCross(cap,e); return; }
+    const band=e.target.closest('[data-chart="sankey"] path[data-action="vacancyCell"]');
+    if(band){ resetCross(); highlightBand(band); showTip(band,e); return; }
+    if(hoverBand) restoreBands();
     const hit=e.target.closest("[data-tip]");
-    if(hit) showTip(hit,e); else tooltip.hidden=true;
+    if(hit) { resetCross(); showTip(hit,e); } else { tooltip.hidden=true; resetCross(); }
   });
-  main.addEventListener("pointerleave",()=>{ tooltip.hidden=true; });
-  main.addEventListener("focusin",e=>showTip(e.target.closest("[data-tip]")));
-  main.addEventListener("focusout",()=>{ tooltip.hidden=true; });
+  main.addEventListener("pointerleave",()=>{ restoreBands(); tooltip.hidden=true; resetCross(); });
+  main.addEventListener("focusin",e=>{
+    const band=e.target.closest('[data-chart="sankey"] path[data-action="vacancyCell"]');
+    if(band){ highlightBand(band); showTip(band); return; }
+    restoreBands();
+    showTip(e.target.closest("[data-tip]"));
+  });
+  main.addEventListener("focusout",()=>{ restoreBands(); tooltip.hidden=true; });
   $("language").addEventListener("change",e=>{
     const drafts=[...main.querySelectorAll('input[type="number"]')].map(input=>[input.id,input.value]);
     language.set(e.target.value);
@@ -1058,7 +1518,7 @@
     render("language");
     for(const [id,value] of drafts) $(id).value=value;
   });
-  window.addEventListener("scroll",()=>{ tooltip.hidden=true; },{passive:true});
+  window.addEventListener("scroll",()=>{ tooltip.hidden=true; resetCross(); },{passive:true});
   window.addEventListener("hashchange",route);
   if (saved.industryDetails===undefined && (fitBroad?.length || fitDetails?.length)) {
     const hadIndustryFilter = state.selected.length>0;
@@ -1069,6 +1529,13 @@
       if(state.occupations==="all") state.occupations=fitOccupations ?? "all";
     }
   }
+  const urlParams = new URLSearchParams(location.search);
+  const indParam = (urlParams.get("ind") || "").split(",").filter(Boolean);
+  if (indParam.length) setIndustryFilter(indParam, []);
+  const occParam = urlParams.get("occ");
+  if (occParam && pathway.occupationGroups.includes(occParam)) state.occupations = occParam;
+  const cellParam = urlParams.get("cell");
+  if (cellParam) state.vacancyCell = cellParam;
   renderInterface();
   route();
 })();

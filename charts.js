@@ -3,9 +3,9 @@
   "use strict";
 
   const {t,year:yearLabel} = globalThis.guideLanguage;
-  const purple = "#76568d";
-  const rose = "#ac4e72";
-  const colors = [purple, "#b783aa", "#65928e", "#bb8b55", "#a184b3", "#797f9d", "#c6929a", "#908575", "#b5a6bd"];
+  const purple = "#8b86e8";
+  const rose = "#cf8fb0";
+  const colors = [purple, "#74b0d4", "#cf8fb0", "#93b88a", "#d4a87e", "#6fc0b4", "#b094d6", "#a8aec6", "#84a0d6"];
   const numberFormat = new Intl.NumberFormat("zh-HK", { maximumFractionDigits: 1 });
   const fixedFormat = new Intl.NumberFormat("zh-HK", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const number = n => Number.isFinite(n) ? numberFormat.format(n) : "—";
@@ -25,6 +25,7 @@
     `<text x="${x}" y="${y}" text-anchor="${anchor}">${esc(label)}</text>`;
   const scale = (a,b,c,d) => n => c + (n-a) / (b-a || 1) * (d-c);
   const empty = message => `<p class="empty">${esc(message)}</p>`;
+  let gradSeq = 0;
   const tickList = (min,max,count = 4) => Array.from({length:count+1}, (_,i) => min+(max-min)*i/count);
   const legend = entries => `<div class="legend">${entries.map(([label, color]) =>
     `<span><i style="background:${color}"></i>${esc(label)}</span>`).join("")}</div>`;
@@ -51,17 +52,27 @@
     };
     const a = axes(w,h,d);
     let out = "";
-    if (opt.highlightX) {
-      const [start,end] = opt.highlightX.map(a.x);
-      out += `<rect class="age-range-highlight" x="${start}" y="${a.top}" width="${end-start}" height="${a.bottom-a.top}" aria-hidden="true"/>`;
-    }
     out += a.grid;
     if (Number.isFinite(opt.refY)) out += line(a.left,a.y(opt.refY),a.right,a.y(opt.refY),"refline");
     if (Number.isFinite(opt.refX) && opt.refX >= d.x[0] && opt.refX <= d.x[1]) {
       out += line(a.x(opt.refX),a.top,a.x(opt.refX),a.bottom,"refline");
     }
+    let defs = "";
     for (const s of sets) {
-      out += `<g opacity="${s.opacity ?? 1}">`;
+      let areaPath = "";
+      if (opt.area || s.area) {
+        const gid = "sa" + (++gradSeq);
+        defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${s.color}" stop-opacity="${s.area ? ".26" : ".32"}"/>
+          <stop offset="1" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`;
+        const coords = [];
+        for (const [x,y] of s.points) if (Number.isFinite(y)) coords.push([a.x(x), a.y(y)]);
+        if (coords.length) {
+          const top = coords.map((p,i)=>`${i?"L":"M"}${p[0]},${p[1]}`).join(" ");
+          areaPath = `<path d="M${coords[0][0]},${a.bottom} ${top} L${coords.at(-1)[0]},${a.bottom} Z" fill="url(#${gid})" stroke="none"/>`;
+        }
+      }
+      out += areaPath + `<g class="series-g" data-ind="${s.key ?? ""}" opacity="${s.opacity ?? 1}">`;
       let draw = "", pen = false;
       for (const [x,y] of s.points) {
         if (!Number.isFinite(y)) { pen = false; continue; }
@@ -79,7 +90,25 @@
       }
       out += "</g>";
     }
-    return svg(w,h,opt.label,out);
+    let cross = "";
+    if (opt.hoverCross !== false) {
+      const xVals = [...new Set(sets.flatMap(s => s.points.map(p => p[0])))].sort((a, b) => a - b);
+      const fmtY = opt.yFormat ?? number, fmtX = opt.xFormat ?? number;
+      cross += `<line class="hover-cross" x1="${a.left}" y1="${a.top}" x2="${a.left}" y2="${a.bottom}"/>`;
+      xVals.forEach((xv, i) => {
+        const cx = a.x(xv);
+        const colLeft = i === 0 ? a.left : (a.x(xVals[i - 1]) + cx) / 2;
+        const colRight = i === xVals.length - 1 ? a.right : (cx + a.x(xVals[i + 1])) / 2;
+        const rows = sets.map(s => {
+          const p = s.points.find(q => q[0] === xv);
+          return p && Number.isFinite(p[1]) ? `${s.name}  ${fmtY(p[1])}` : null;
+        }).filter(Boolean);
+        const tip = `${fmtX(xv)}\n${rows.join("\n")}`;
+        cross += `<rect class="x-capture" x="${colLeft}" y="${a.top}" width="${Math.max(1, colRight - colLeft)}" height="${a.bottom - a.top}"`
+          + ` data-cross-x="${cx}" data-cross-tip="${esc(tip)}"/>`;
+      });
+    }
+    return svg(w,h,opt.label,`<defs>${defs}</defs>`+out+cross);
   }
 
   function stack(w, sets, years, year) {
@@ -87,14 +116,19 @@
     const a = axes(w,h,{x:[years[0],years.at(-1)], y:[0,100], yFormat: percent,
       xFormat: String, xTicks: years.filter((_,i)=>i===years.length-1 || (i%4===0 && i<years.length-2))});
     let base = years.map(()=>0);
-    let content = a.grid;
+    let content = a.grid, defs = "";
     let targets = "";
     const midpoint = (a,b) => (a+b)/2;
     for (const [seriesIndex,s] of sets.entries()) {
       const high = years.map((_,i)=>base[i]+(s.values[i] ?? 0));
       const top = years.map((y,i)=>`${a.x(y)},${a.y(high[i])}`);
       const bottom = years.map((y,i)=>`${a.x(y)},${a.y(base[i])}`).reverse();
-      content += `<polygon points="${[...top,...bottom].join(" ")}" fill="${s.color}" opacity=".86"/>`;
+      const gid = "st" + (++gradSeq);
+      defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${s.color}" stop-opacity=".96"/>
+        <stop offset="1" stop-color="${s.color}" stop-opacity=".72"/></linearGradient>`;
+      content += `<polygon class="stack-band" data-ind="${seriesIndex}" points="${[...top,...bottom].join(" ")}" fill="url(#${gid})"/>`;
+      content += `<polyline class="stack-line" data-ind="${seriesIndex}" points="${top.join(" ")}" fill="none" stroke="${s.color}" stroke-width="1.1" opacity=".55" stroke-linejoin="round" stroke-linecap="round"/>`;
       // Follow both edges of the band to the midpoints between adjacent years.
       for (const [i,y] of years.entries()) {
         if (!Number.isFinite(s.values[i]) || s.values[i]<=0) continue;
@@ -112,7 +146,7 @@
       base = high;
     }
     content += line(a.x(year),a.top,a.x(year),a.bottom,"refline");
-    return svg(w,h,t("各行业占全部香港就业的百分比堆叠面积图","Stacked area chart of industry shares in Hong Kong employment"),content+targets);
+    return svg(w,h,t("各行业占全部香港就业的百分比堆叠面积图","Stacked area chart of industry shares in Hong Kong employment"),`<defs>${defs}</defs>`+content+targets);
   }
 
   function bars(rows, opt = {}) {
@@ -146,15 +180,26 @@
 
   function donut(rows) {
     const total = rows.reduce((n,r)=>n+r.value,0);
-    let start = 0;
-    const slices = rows.map((r,i)=>{
-      const end = start + r.value/total*100;
-      const part = `${colors[i]} ${start}% ${end}%`;
-      start = end;
-      return part;
+    const size=190, cx=size/2, cy=size/2, r=size/2-16, sw=24, C=2*Math.PI*r;
+    let offset=0, defs="", arcs="";
+    rows.forEach((row,i)=>{
+      const frac=row.value/total, len=frac*C, color=colors[i], gid="dn"+(++gradSeq);
+      defs+=`<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${color}" stop-opacity="1"/>
+        <stop offset="1" stop-color="${color}" stop-opacity=".72"/></linearGradient>`;
+      const tip=`${row.name} · ${percent(frac*100)}`;
+      const raw=row.raw ?? row.name;
+      arcs+=`<circle class="donut-slice" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${gid})" stroke-width="${sw}"
+        stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-offset}" data-tip="${esc(tip)}" data-status="${esc(raw)}"
+        data-action="crossStatus" data-value="${esc(raw)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      offset+=len;
     });
-    return `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(${slices.join(",")})" aria-hidden="true"><span>${number(total)}<small>${t("千人","thousand people")}</small></span></div>
-      <ul class="donut-legend">${rows.map((r,i)=>`<li><i style="background:${colors[i]}"></i><span>${esc(r.name)}</span><strong>${percent(r.value/total*100)}</strong></li>`).join("")}</ul></div>`;
+    const svgDonut=`<svg viewBox="0 0 ${size} ${size}" class="donut-svg" role="img">
+      <defs>${defs}</defs>${arcs}
+      <text x="${cx}" y="${cy-1}" text-anchor="middle" class="donut-total">${number(total)}</text>
+      <text x="${cx}" y="${cy+17}" text-anchor="middle" class="donut-sub">${esc(t("千人","thousand"))}</text></svg>`;
+    return `<div class="donut-wrap">${svgDonut}
+      <ul class="donut-legend">${rows.map((r,i)=>{const raw=r.raw??r.name;return `<li role="button" tabindex="0" data-action="crossStatus" data-value="${esc(raw)}" data-status="${esc(raw)}"><i style="background:${colors[i]}"></i><span>${esc(r.name)}</span><strong>${percent(r.value/total*100)}</strong></li>`;}).join("")}</ul></div>`;
   }
 
   function treemap(rows) {
@@ -172,8 +217,8 @@
     }
     return `<div class="treemap" aria-label="${t("职业人数矩形树图","Treemap of employment by occupation")}">${layout(ranked,0,0,100,100).map((r,i)=>{
       const tip = `${r.name} · ${number(r.value)}${t(" 千人"," thousand people")} · ${percent(r.value/total*100)}`;
-      const action = r.occupation ? ` data-action="occupationGroup" data-value="${esc(r.occupation)}"` : "";
-      return `<button type="button" aria-label="${esc(tip)}" data-tip="${esc(tip)}"${action} style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:${["#d8c5e2","#eac5db","#ccbedf","#d5d5e7","#e2cfd7","#c8d8d5","#ddcbbf","#e5dce8","#dbc8d3"][i]};color:#2b2030"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
+      const occ = r.occ ?? r.occupation ?? r.name;
+      return `<button type="button" class="tree-tile" data-occ="${esc(occ)}" aria-label="${esc(tip)}" data-tip="${esc(tip)}" data-action="crossOcc" data-value="${esc(occ)}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:linear-gradient(155deg,rgba(255,255,255,.09),rgba(255,255,255,0) 55%),${["#2e2a4d","#4a2f45","#332e4d","#2f3548","#453340","#2c403d","#43362e","#352f47","#3e2f3d"][i]};color:#e9e7f2"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
     }).join("")}</div>`;
   }
 
@@ -214,12 +259,51 @@
     rows.forEach((r,i)=>{
       const x=a.x(i), high=Math.min(a.y(r.from),a.y(r.to)), low=Math.max(a.y(r.from),a.y(r.to));
       const tip = r.label + " " + money(r.value);
-      content += `<rect x="${x-width/2}" y="${high}" width="${width}" height="${Math.max(low-high,1)}" fill="${i===0 || i===4 ? purple : "#bfa4ce"}" rx="3" ${mark(tip)}/>`;
+      content += `<rect x="${x-width/2}" y="${high}" width="${width}" height="${Math.max(low-high,1)}" fill="${i===0 || i===4 ? purple : "#6f68b0"}" rx="3" ${mark(tip)}/>`;
       if(i<3) content+=line(x+width/2,a.y(r.to),a.x(i+1)-width/2,a.y(r.to),"gridline");
       content+=text(x,high-5,number(r.value/1000)+"k")+text(x,a.bottom+23,r.label);
     });
     return svg(w,h,t("个人生活预算瀑布图","Monthly budget waterfall chart"),content);
   }
 
-  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall};
+  function opportunity(w, sets) {
+    const rows = sets.map(s=>{
+      const pts = s.points.filter(p=>Number.isFinite(p[1]));
+      const first = pts[0]?.[1], last = pts.at(-1)?.[1];
+      return { name:s.name, color:s.color, pts, first, last, pct:(last/first - 1)*100 };
+    }).sort((a,b)=>b.pct-a.pct);
+    const allVals = rows.flatMap(r=>r.pts.map(p=>p[1]));
+    const gmin=Math.min(...allVals), gmax=Math.max(...allVals);
+    const maxAbs=Math.max(...rows.map(r=>Math.abs(r.pct)),1);
+    const W=100,H=28,pad=2;
+    const spark = r=>{
+      const xs=r.pts.map(p=>p[0]),xmin=Math.min(...xs),xmax=Math.max(...xs);
+      const d=r.pts.map((p,i)=>{
+        const x=pad+(p[0]-xmin)/Math.max(1e-9,xmax-xmin)*(W-2*pad);
+        const y=H-pad-(p[1]-gmin)/Math.max(1e-9,gmax-gmin)*(H-2*pad);
+        return `${i?"L":"M"}${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      return `<svg class="opp-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}" fill="none" stroke="${r.color}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+    };
+    const tagOf = pct => pct>2 ? ["up",t("扩张","Growing")] : pct<-2 ? ["down",t("收缩","Shrinking")] : ["flat",t("平稳","Stable")];
+    const up=rows.filter(r=>r.pct>2).length, down=rows.filter(r=>r.pct<-2).length, top=rows[0];
+    const summary=t(`${rows.length} 个行业中 ${up} 个用工扩张、${down} 个收缩；${top.name} 累计变化最大。`,
+      `${up} of ${rows.length} industries grew, ${down} shrank; ${top.name} changed most.`);
+    const body = rows.map(r=>{
+      const [cls,tag]=tagOf(r.pct);
+      const half=Math.abs(r.pct)/maxAbs*50;
+      const bar = r.pct>=0
+        ? `<span class="opp-bar up" style="left:50%;width:${half}%"></span>`
+        : `<span class="opp-bar down" style="right:50%;width:${half}%"></span>`;
+      const signed=(r.pct>=0?"+":"")+r.pct.toFixed(1)+"%";
+      return `<div class="opp-row">
+        <span class="opp-name">${esc(r.name)}</span>${spark(r)}
+        <span class="opp-track"><span class="opp-zero"></span>${bar}</span>
+        <span class="opp-val ${cls}">${signed}</span><span class="opp-tag ${cls}">${tag}</span></div>`;
+    }).join("");
+    return `<div class="opp-box"><p class="opp-summary">${esc(summary)}</p>
+      <div class="opp-list" role="table" aria-label="${esc(t("行业用工机会","Industry employment opportunities"))}">${body}</div></div>`;
+  }
+
+  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall,opportunity};
 })();
