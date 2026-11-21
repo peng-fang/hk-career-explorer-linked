@@ -3,9 +3,21 @@
   "use strict";
 
   const {t,year:yearLabel} = globalThis.guideLanguage;
-  const purple = "#8b86e8";
-  const rose = "#cf8fb0";
-  const colors = [purple, "#74b0d4", "#cf8fb0", "#93b88a", "#d4a87e", "#6fc0b4", "#b094d6", "#a8aec6", "#84a0d6"];
+  const palettes = {
+    dark: {
+      purple: "#8b86e8", rose: "#cf8fb0",
+      colors: ["#8b86e8", "#74b0d4", "#cf8fb0", "#93b88a", "#d4a87e", "#6fc0b4", "#b094d6", "#a8aec6", "#84a0d6"],
+      tileBg: ["#2e2a4d", "#4a2f45", "#332e4d", "#2f3548", "#453340", "#2c403d", "#43362e", "#352f47", "#3e2f3d"],
+      tileInk: "#e9e7f2", altBar: "#6f68b0", tileSheen: "linear-gradient(155deg,rgba(255,255,255,.09),rgba(255,255,255,0) 55%),"
+    },
+    light: {
+      purple: "#76568d", rose: "#ac4e72",
+      colors: ["#76568d", "#b783aa", "#65928e", "#bb8b55", "#a184b3", "#797f9d", "#c6929a", "#908575", "#b5a6bd"],
+      tileBg: ["#d8c5e2", "#eac5db", "#ccbedf", "#d5d5e7", "#e2cfd7", "#c8d8d5", "#ddcbbf", "#e5dce8", "#dbc8d3"],
+      tileInk: "#2b2030", altBar: "#bfa4ce", tileSheen: ""
+    }
+  };
+  const pal = () => palettes[globalThis.guideTheme && globalThis.guideTheme.isDark() ? "dark" : "light"];
   const numberFormat = new Intl.NumberFormat("zh-HK", { maximumFractionDigits: 1 });
   const fixedFormat = new Intl.NumberFormat("zh-HK", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const number = n => Number.isFinite(n) ? numberFormat.format(n) : "—";
@@ -161,7 +173,7 @@
       const pressed = opt.active===key;
       const tip = [row.name,opt.labels?.[i],value].filter(Boolean).join(" · ");
       const dimmed = opt.active && !pressed ? " is-muted" : "";
-      const style = `width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? colors[i]}`;
+      const style = `width:${Math.max(0,v/max)*cap}%;background:${opt.colors?.[i] ?? pal().colors[i]}`;
       return opt.action
         ? `<button type="button" class="bar chart-bar${dimmed}" style="${style}" aria-label="${esc(tip)}" aria-pressed="${pressed}" data-tip="${esc(tip)}" data-action="${opt.action}" data-value="${esc(key)}" data-focus="${esc(`${opt.action}:${opt.label}:${row.name}:${i}`)}"><b>${esc(value)}</b></button>`
         : `<span class="bar" style="${style}" data-tip="${esc(tip)}"><b>${esc(value)}</b></span>`;
@@ -183,7 +195,7 @@
     const size=190, cx=size/2, cy=size/2, r=size/2-16, sw=24, C=2*Math.PI*r;
     let offset=0, defs="", arcs="";
     rows.forEach((row,i)=>{
-      const frac=row.value/total, len=frac*C, color=colors[i], gid="dn"+(++gradSeq);
+      const frac=row.value/total, len=frac*C, color=pal().colors[i], gid="dn"+(++gradSeq);
       defs+=`<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="${color}" stop-opacity="1"/>
         <stop offset="1" stop-color="${color}" stop-opacity=".72"/></linearGradient>`;
@@ -199,7 +211,7 @@
       <text x="${cx}" y="${cy-1}" text-anchor="middle" class="donut-total">${number(total)}</text>
       <text x="${cx}" y="${cy+17}" text-anchor="middle" class="donut-sub">${esc(t("千人","thousand"))}</text></svg>`;
     return `<div class="donut-wrap">${svgDonut}
-      <ul class="donut-legend">${rows.map((r,i)=>{const raw=r.raw??r.name;return `<li role="button" tabindex="0" data-action="crossStatus" data-value="${esc(raw)}" data-status="${esc(raw)}"><i style="background:${colors[i]}"></i><span>${esc(r.name)}</span><strong>${percent(r.value/total*100)}</strong></li>`;}).join("")}</ul></div>`;
+      <ul class="donut-legend">${rows.map((r,i)=>{const raw=r.raw??r.name;return `<li role="button" tabindex="0" data-action="crossStatus" data-value="${esc(raw)}" data-status="${esc(raw)}"><i style="background:${pal().colors[i]}"></i><span>${esc(r.name)}</span><strong>${percent(r.value/total*100)}</strong></li>`;}).join("")}</ul></div>`;
   }
 
   function treemap(rows) {
@@ -218,7 +230,7 @@
     return `<div class="treemap" aria-label="${t("职业人数矩形树图","Treemap of employment by occupation")}">${layout(ranked,0,0,100,100).map((r,i)=>{
       const tip = `${r.name} · ${number(r.value)}${t(" 千人"," thousand people")} · ${percent(r.value/total*100)}`;
       const occ = r.occ ?? r.occupation ?? r.name;
-      return `<button type="button" class="tree-tile" data-occ="${esc(occ)}" aria-label="${esc(tip)}" data-tip="${esc(tip)}" data-action="crossOcc" data-value="${esc(occ)}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:linear-gradient(155deg,rgba(255,255,255,.09),rgba(255,255,255,0) 55%),${["#2e2a4d","#4a2f45","#332e4d","#2f3548","#453340","#2c403d","#43362e","#352f47","#3e2f3d"][i]};color:#e9e7f2"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
+      return `<button type="button" class="tree-tile" data-occ="${esc(occ)}" aria-label="${esc(tip)}" data-tip="${esc(tip)}" data-action="crossOcc" data-value="${esc(occ)}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;background:${pal().tileSheen}${pal().tileBg[i]};color:${pal().tileInk}"><span class="tile-label">${r.w*r.h>220 ? esc(r.name) : ""}</span></button>`;
     }).join("")}</div>`;
   }
 
@@ -233,7 +245,7 @@
     for(const r of values.slice().sort((a,b)=>b.openings-a.openings)) {
       const selected = picked.includes(r.id);
       const tip = `${r.name}\n${t("空缺率","Vacancy rate")} ${percent(r.rate*100)} · ${number(r.openings)}${t(" 个"," vacancies")}\n${t("用工同比","Employment YoY")} ${percent(r.yoy*100)}`;
-      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? purple : rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,"bubble",r.id,selected)}/>`;
+      content += `<circle cx="${a.x(r.rate*100)}" cy="${a.y(r.yoy*100)}" r="${Math.sqrt(r.openings/max)*22}" fill="${r.yoy>=0 ? pal().purple : pal().rose}" opacity="${picked.length && !selected ? .31 : .86}" ${mark(tip,"bubble",r.id,selected)}/>`;
     }
     return svg(w,h,t("招聘机会地图，横轴职位空缺率，纵轴机构用工同比","Hiring opportunities. X: vacancy rate. Y: year-on-year employment change."),content);
   }
@@ -259,7 +271,7 @@
     rows.forEach((r,i)=>{
       const x=a.x(i), high=Math.min(a.y(r.from),a.y(r.to)), low=Math.max(a.y(r.from),a.y(r.to));
       const tip = r.label + " " + money(r.value);
-      content += `<rect x="${x-width/2}" y="${high}" width="${width}" height="${Math.max(low-high,1)}" fill="${i===0 || i===4 ? purple : "#6f68b0"}" rx="3" ${mark(tip)}/>`;
+      content += `<rect x="${x-width/2}" y="${high}" width="${width}" height="${Math.max(low-high,1)}" fill="${i===0 || i===4 ? pal().purple : pal().altBar}" rx="3" ${mark(tip)}/>`;
       if(i<3) content+=line(x+width/2,a.y(r.to),a.x(i+1)-width/2,a.y(r.to),"gridline");
       content+=text(x,high-5,number(r.value/1000)+"k")+text(x,a.bottom+23,r.label);
     });
@@ -305,5 +317,10 @@
       <div class="opp-list" role="table" aria-label="${esc(t("行业用工机会","Industry employment opportunities"))}">${body}</div></div>`;
   }
 
-  globalThis.guideCharts = {purple,rose,colors,number,percent,money,esc,mark,empty,legend,series,stack,bars,donut,treemap,bubbles,waterfall,opportunity};
+  globalThis.guideCharts = {
+    get purple(){ return pal().purple; },
+    get rose(){ return pal().rose; },
+    get colors(){ return pal().colors; },
+    number, percent, money, esc, mark, empty, legend, series, stack, bars, donut, treemap, bubbles, waterfall, opportunity
+  };
 })();
